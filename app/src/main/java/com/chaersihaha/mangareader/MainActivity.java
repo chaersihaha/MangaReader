@@ -657,7 +657,8 @@ public class MainActivity extends Activity {
             (v, event) -> {
                 if (
                     event.getAction() ==
-                    View.DragEvent.ACTION_DROP
+                
+android.view.DragEvent.ACTION_DROP
                 ) {
                     File dragged =
                         (File) event.getLocalState();
