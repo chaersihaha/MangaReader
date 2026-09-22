@@ -82,7 +82,7 @@ public class MainActivity extends Activity {
         super.onWindowFocusChanged(hasFocus);
 
         if (hasFocus) {
-            fullscreen();
+    
         }
     }
 
@@ -101,7 +101,7 @@ public class MainActivity extends Activity {
     }
 
     private void base() {
-        fullscreen();
+    
 
         root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
