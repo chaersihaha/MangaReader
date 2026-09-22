@@ -42,7 +42,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        fullscreen();
+    
 
         sp = getSharedPreferences("meta", MODE_PRIVATE);
         booksDir = new File(getFilesDir(), "books");
