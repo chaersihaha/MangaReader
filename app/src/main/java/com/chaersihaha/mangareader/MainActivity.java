@@ -45,15 +45,36 @@ public class MainActivity extends Activity {
 
     private String pendingCoverDisplayName = null;
 
-    // 书架拖动排序
     private File draggingBook = null;
     private boolean isDraggingBook = false;
+
+    // =========================================================
+    // 视觉系统
+    // =========================================================
+
+    private static final int BG = Color.rgb(14, 14, 16);
+    private static final int SURFACE = Color.rgb(22, 22, 25);
+    private static final int SURFACE_2 = Color.rgb(29, 29, 33);
+    private static final int SURFACE_3 = Color.rgb(36, 36, 41);
+
+    private static final int TEXT_PRIMARY =
+            Color.rgb(242, 242, 244);
+
+    private static final int TEXT_SECONDARY =
+            Color.rgb(165, 165, 171);
+
+    private static final int TEXT_MUTED =
+            Color.rgb(105, 105, 112);
+
+    private static final int ACCENT =
+            Color.rgb(214, 214, 220);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // 隐藏顶部状态栏
+        // 保持当前稳定的全屏方案。
+        // 不使用 WindowInsetsController。
         getWindow().setFlags(
                 WindowManager.LayoutParams.FLAG_FULLSCREEN,
                 WindowManager.LayoutParams.FLAG_FULLSCREEN
@@ -86,11 +107,74 @@ public class MainActivity extends Activity {
                 LinearLayout.VERTICAL
         );
 
-        root.setBackgroundColor(
-                Color.BLACK
-        );
+        root.setBackgroundColor(BG);
 
         setContentView(root);
+    }
+
+    private GradientDrawable roundedBg(
+            int color,
+            int radius
+    ) {
+
+        GradientDrawable bg =
+                new GradientDrawable();
+
+        bg.setColor(color);
+        bg.setCornerRadius(dp(radius));
+
+        return bg;
+    }
+
+    private GradientDrawable strokeBg(
+            int color,
+            int strokeColor,
+            int strokeWidth,
+            int radius
+    ) {
+
+        GradientDrawable bg =
+                roundedBg(color, radius);
+
+        bg.setStroke(
+                dp(strokeWidth),
+                strokeColor
+        );
+
+        return bg;
+    }
+
+    private TextView makeLabel(
+            String text,
+            float size,
+            int color
+    ) {
+
+        TextView view =
+                new TextView(this);
+
+        view.setText(text);
+        view.setTextSize(size);
+        view.setTextColor(color);
+
+        return view;
+    }
+
+    private void addSpacer(
+            LinearLayout parent,
+            int height
+    ) {
+
+        View spacer =
+                new View(this);
+
+        parent.addView(
+                spacer,
+                new LinearLayout.LayoutParams(
+                        1,
+                        dp(height)
+                )
+        );
     }
 
     private String getDisplayName(File book) {
@@ -144,6 +228,10 @@ public class MainActivity extends Activity {
         currentBook = null;
         base();
 
+        // -----------------------------------------------------
+        // 顶部标题
+        // -----------------------------------------------------
+
         LinearLayout header =
                 new LinearLayout(this);
 
@@ -152,26 +240,24 @@ public class MainActivity extends Activity {
         );
 
         header.setGravity(
-                Gravity.CENTER_VERTICAL
+                Gravity.BOTTOM
         );
 
         header.setPadding(
                 dp(20),
-                dp(10),
+                dp(18),
                 dp(20),
-                dp(8)
+                dp(12)
         );
 
-        header.setBackgroundColor(
-                Color.BLACK
-        );
+        header.setBackgroundColor(BG);
 
         TextView title =
-                new TextView(this);
-
-        title.setText("GPT漫画");
-        title.setTextSize(21);
-        title.setTextColor(Color.WHITE);
+                makeLabel(
+                        "GPT漫画",
+                        24,
+                        TEXT_PRIMARY
+                );
 
         title.setTypeface(
                 Typeface.DEFAULT,
@@ -187,12 +273,17 @@ public class MainActivity extends Activity {
         );
 
         TextView subtitle =
-                new TextView(this);
+                makeLabel(
+                        "你的漫画空间",
+                        12,
+                        TEXT_MUTED
+                );
 
-        subtitle.setText("我的书库");
-        subtitle.setTextSize(12);
-        subtitle.setTextColor(
-                Color.rgb(125, 125, 125)
+        subtitle.setPadding(
+                0,
+                dp(3),
+                0,
+                0
         );
 
         header.addView(
@@ -207,16 +298,18 @@ public class MainActivity extends Activity {
                 header,
                 new LinearLayout.LayoutParams(
                         -1,
-                        dp(68)
+                        dp(76)
                 )
         );
+
+        // -----------------------------------------------------
+        // 内容区域
+        // -----------------------------------------------------
 
         FrameLayout shelfContainer =
                 new FrameLayout(this);
 
-        shelfContainer.setBackgroundColor(
-                Color.BLACK
-        );
+        shelfContainer.setBackgroundColor(BG);
 
         root.addView(
                 shelfContainer,
@@ -230,10 +323,7 @@ public class MainActivity extends Activity {
         ScrollView shelfScroll =
                 new ScrollView(this);
 
-        shelfScroll.setBackgroundColor(
-                Color.BLACK
-        );
-
+        shelfScroll.setBackgroundColor(BG);
         shelfScroll.setFillViewport(true);
         shelfScroll.setClipToPadding(false);
 
@@ -245,15 +335,13 @@ public class MainActivity extends Activity {
         );
 
         shelf.setPadding(
-                dp(8),
+                dp(10),
                 dp(4),
-                dp(8),
-                dp(100)
+                dp(10),
+                dp(110)
         );
 
-        shelf.setBackgroundColor(
-                Color.BLACK
-        );
+        shelf.setBackgroundColor(BG);
 
         shelfScroll.addView(shelf);
 
@@ -265,33 +353,51 @@ public class MainActivity extends Activity {
                 )
         );
 
+        // -----------------------------------------------------
+        // 新建按钮
+        // -----------------------------------------------------
+
         TextView create =
                 new TextView(this);
 
         create.setText("+");
-        create.setTextSize(27);
-        create.setTextColor(Color.WHITE);
+        create.setTextSize(25);
+        create.setTextColor(TEXT_PRIMARY);
         create.setGravity(Gravity.CENTER);
 
         GradientDrawable createBg =
-                new GradientDrawable();
+                roundedBg(
+                        Color.rgb(42, 42, 46),
+                        20
+                );
 
-        createBg.setColor(
-                Color.rgb(42, 42, 42)
-        );
-
-        createBg.setShape(
-                GradientDrawable.OVAL
+        createBg.setStroke(
+                dp(1),
+                Color.rgb(62, 62, 67)
         );
 
         create.setBackground(createBg);
 
-        create.setElevation(
-                dp(10)
-        );
+        create.setElevation(dp(8));
 
         create.setOnClickListener(
-                v -> createBook()
+                v -> {
+
+                    v.animate()
+                            .scaleX(0.91f)
+                            .scaleY(0.91f)
+                            .setDuration(70)
+                            .withEndAction(() ->
+                                    v.animate()
+                                            .scaleX(1f)
+                                            .scaleY(1f)
+                                            .setDuration(100)
+                                            .start()
+                            )
+                            .start();
+
+                    createBook();
+                }
         );
 
         FrameLayout.LayoutParams createParams =
@@ -304,8 +410,8 @@ public class MainActivity extends Activity {
         createParams.setMargins(
                 dp(12),
                 dp(12),
-                dp(18),
-                dp(18)
+                dp(20),
+                dp(20)
         );
 
         shelfContainer.addView(
@@ -344,28 +450,101 @@ public class MainActivity extends Activity {
 
     private void showEmptyShelf() {
 
-        TextView empty =
-                new TextView(this);
+        LinearLayout empty =
+                new LinearLayout(this);
 
-        empty.setText(
-                "书库还是空的\n\n点击右下角 ＋ 添加第一本漫画"
-        );
-
-        empty.setTextSize(14);
-
-        empty.setTextColor(
-                Color.rgb(105, 105, 105)
+        empty.setOrientation(
+                LinearLayout.VERTICAL
         );
 
         empty.setGravity(
                 Gravity.CENTER
         );
 
+        TextView icon =
+                makeLabel(
+                        "+",
+                        32,
+                        TEXT_MUTED
+                );
+
+        icon.setGravity(Gravity.CENTER);
+
+        GradientDrawable iconBg =
+                roundedBg(
+                        SURFACE,
+                        22
+                );
+
+        iconBg.setStroke(
+                dp(1),
+                Color.rgb(48, 48, 52)
+        );
+
+        icon.setBackground(iconBg);
+
+        empty.addView(
+                icon,
+                new LinearLayout.LayoutParams(
+                        dp(64),
+                        dp(64)
+                )
+        );
+
+        TextView title =
+                makeLabel(
+                        "书库还是空的",
+                        16,
+                        TEXT_PRIMARY
+                );
+
+        title.setGravity(Gravity.CENTER);
+
+        title.setTypeface(
+                Typeface.DEFAULT,
+                Typeface.BOLD
+        );
+
+        LinearLayout.LayoutParams titleParams =
+                new LinearLayout.LayoutParams(
+                        -1,
+                        -2
+                );
+
+        titleParams.setMargins(
+                dp(20),
+                dp(18),
+                dp(20),
+                dp(4)
+        );
+
+        empty.addView(
+                title,
+                titleParams
+        );
+
+        TextView hint =
+                makeLabel(
+                        "点击右下角 ＋ 添加第一本漫画",
+                        13,
+                        TEXT_MUTED
+                );
+
+        hint.setGravity(Gravity.CENTER);
+
+        empty.addView(
+                hint,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        -2
+                )
+        );
+
         shelf.addView(
                 empty,
                 new LinearLayout.LayoutParams(
                         -1,
-                        dp(280)
+                        dp(340)
                 )
         );
     }
@@ -438,9 +617,7 @@ public class MainActivity extends Activity {
                         )
         );
 
-        ordered.addAll(
-                remaining
-        );
+        ordered.addAll(remaining);
 
         list.clear();
         list.addAll(ordered);
@@ -495,13 +672,6 @@ public class MainActivity extends Activity {
 
             row.setGravity(
                     Gravity.TOP
-            );
-
-            row.setPadding(
-                    dp(2),
-                    dp(3),
-                    dp(2),
-                    dp(3)
             );
 
             shelf.addView(
@@ -561,23 +731,16 @@ public class MainActivity extends Activity {
                 dp(5),
                 dp(5),
                 dp(5),
-                dp(5)
+                dp(8)
         );
 
         GradientDrawable itemBg =
-                new GradientDrawable();
+                roundedBg(
+                        SURFACE,
+                        10
+                );
 
-        itemBg.setColor(
-                Color.BLACK
-        );
-
-        itemBg.setCornerRadius(
-                dp(7)
-        );
-
-        item.setBackground(
-                itemBg
-        );
+        item.setBackground(itemBg);
 
         row.addView(
                 item,
@@ -591,16 +754,14 @@ public class MainActivity extends Activity {
         ImageView coverView =
                 new ImageView(this);
 
-        coverView.setAdjustViewBounds(
-                true
-        );
+        coverView.setAdjustViewBounds(true);
 
         coverView.setScaleType(
                 ImageView.ScaleType.FIT_CENTER
         );
 
         coverView.setBackgroundColor(
-                Color.BLACK
+                Color.rgb(18, 18, 20)
         );
 
         if (hasCover(book)) {
@@ -613,52 +774,41 @@ public class MainActivity extends Activity {
 
         } else {
 
+            LinearLayout.LayoutParams
+                    noCoverParams =
+                    new LinearLayout.LayoutParams(
+                            -1,
+                            dp(190)
+                    );
+
+            noCoverParams.setMargins(
+                    dp(2),
+                    dp(2),
+                    dp(2),
+                    dp(2)
+            );
+
             TextView noCover =
-                    new TextView(this);
-
-            noCover.setText(
-                    "暂无封面"
-            );
-
-            noCover.setTextSize(14);
-
-            noCover.setTextColor(
-                    Color.rgb(
-                            115,
-                            115,
-                            115
-                    )
-            );
+                    makeLabel(
+                            "暂无封面",
+                            13,
+                            TEXT_MUTED
+                    );
 
             noCover.setGravity(
                     Gravity.CENTER
             );
 
-            GradientDrawable noCoverBg =
-                    new GradientDrawable();
-
-            noCoverBg.setColor(
-                    Color.rgb(
-                            20,
-                            20,
-                            20
-                    )
-            );
-
-            noCoverBg.setCornerRadius(
-                    dp(7)
-            );
-
             noCover.setBackground(
-                    noCoverBg
+                    roundedBg(
+                            Color.rgb(18, 18, 20),
+                            8
+                    )
             );
 
             item.addView(
                     noCover,
-                    new LinearLayout.LayoutParams(
-                            -1,
-                            dp(170)
-                    )
+                    noCoverParams
             );
 
             setupBookTouch(
@@ -676,10 +826,10 @@ public class MainActivity extends Activity {
                 );
 
         coverParams.setMargins(
-                0,
-                0,
-                0,
-                dp(3)
+                dp(2),
+                dp(2),
+                dp(2),
+                dp(2)
         );
 
         item.addView(
@@ -704,6 +854,19 @@ public class MainActivity extends Activity {
                     if (isDraggingBook) {
                         return;
                     }
+
+                    v.animate()
+                            .scaleX(0.975f)
+                            .scaleY(0.975f)
+                            .setDuration(70)
+                            .withEndAction(() ->
+                                    v.animate()
+                                            .scaleX(1f)
+                                            .scaleY(1f)
+                                            .setDuration(100)
+                                            .start()
+                            )
+                            .start();
 
                     showBookMenu(book);
                 }
@@ -870,13 +1033,8 @@ public class MainActivity extends Activity {
                 to
         );
 
-        saveShelfOrder(
-                books
-        );
-
-        rebuildShelf(
-                books
-        );
+        saveShelfOrder(books);
+        rebuildShelf(books);
 
         isDraggingBook = false;
         draggingBook = null;
@@ -898,28 +1056,29 @@ public class MainActivity extends Activity {
         );
 
         panel.setPadding(
-                dp(18),
-                dp(18),
-                dp(18),
-                dp(12)
+                dp(16),
+                dp(16),
+                dp(16),
+                dp(10)
         );
 
-        panel.setBackgroundColor(
-                Color.BLACK
-        );
-
-        ImageView cover =
-                new ImageView(this);
-
-        cover.setAdjustViewBounds(
-                true
-        );
-
-        cover.setScaleType(
-                ImageView.ScaleType.FIT_CENTER
+        panel.setBackground(
+                roundedBg(
+                        Color.rgb(20, 20, 23),
+                        20
+                )
         );
 
         if (hasCover(book)) {
+
+            ImageView cover =
+                    new ImageView(this);
+
+            cover.setAdjustViewBounds(true);
+
+            cover.setScaleType(
+                    ImageView.ScaleType.FIT_CENTER
+            );
 
             cover.setImageURI(
                     Uri.fromFile(
@@ -931,25 +1090,19 @@ public class MainActivity extends Activity {
                     cover,
                     new LinearLayout.LayoutParams(
                             -1,
-                            dp(220)
+                            dp(230)
                     )
             );
         }
 
         TextView name =
-                new TextView(this);
+                makeLabel(
+                        getDisplayName(book),
+                        19,
+                        TEXT_PRIMARY
+                );
 
-        name.setText(
-                getDisplayName(book)
-        );
-
-        name.setTextSize(19);
-        name.setTextColor(Color.WHITE);
-
-        name.setGravity(
-                Gravity.CENTER
-        );
-
+        name.setGravity(Gravity.CENTER);
         name.setTypeface(
                 Typeface.DEFAULT,
                 Typeface.BOLD
@@ -959,7 +1112,7 @@ public class MainActivity extends Activity {
                 dp(8),
                 dp(12),
                 dp(8),
-                dp(12)
+                dp(14)
         );
 
         panel.addView(
@@ -971,112 +1124,27 @@ public class MainActivity extends Activity {
         );
 
         TextView read =
-                new TextView(this);
-
-        read.setText(
-                "进入阅读"
-        );
-
-        read.setTextSize(17);
-        read.setTextColor(Color.WHITE);
-
-        read.setGravity(
-                Gravity.CENTER
-        );
-
-        GradientDrawable readBg =
-                new GradientDrawable();
-
-        readBg.setColor(
-                Color.rgb(
-                        55,
-                        55,
-                        55
-                )
-        );
-
-        readBg.setCornerRadius(
-                dp(8)
-        );
-
-        read.setBackground(
-                readBg
-        );
-
-        LinearLayout.LayoutParams readParams =
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(52)
+                modernAction(
+                        "进入阅读",
+                        TEXT_PRIMARY,
+                        SURFACE_3
                 );
-
-        readParams.setMargins(
-                0,
-                dp(5),
-                0,
-                dp(5)
-        );
 
         panel.addView(
                 read,
-                readParams
+                actionParams(52, 5)
         );
 
         TextView manage =
-                new TextView(this);
-
-        manage.setText(
-                "管理书本"
-        );
-
-        manage.setTextSize(17);
-
-        manage.setTextColor(
-                Color.rgb(
-                        220,
-                        220,
-                        220
-                )
-        );
-
-        manage.setGravity(
-                Gravity.CENTER
-        );
-
-        GradientDrawable manageBg =
-                new GradientDrawable();
-
-        manageBg.setColor(
-                Color.rgb(
-                        35,
-                        35,
-                        35
-                )
-        );
-
-        manageBg.setCornerRadius(
-                dp(8)
-        );
-
-        manage.setBackground(
-                manageBg
-        );
-
-        LinearLayout.LayoutParams manageParams =
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(52)
+                modernAction(
+                        "管理书本",
+                        TEXT_SECONDARY,
+                        SURFACE_2
                 );
-
-        manageParams.setMargins(
-                0,
-                dp(5),
-                0,
-                dp(5)
-        );
 
         panel.addView(
                 manage,
-                manageParams
+                actionParams(52, 5)
         );
 
         AlertDialog dialog =
@@ -1118,6 +1186,76 @@ public class MainActivity extends Activity {
         );
 
         dialog.show();
+    }
+
+    private LinearLayout.LayoutParams actionParams(
+            int height,
+            int margin
+    ) {
+
+        LinearLayout.LayoutParams params =
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(height)
+                );
+
+        params.setMargins(
+                0,
+                dp(margin),
+                0,
+                dp(margin)
+        );
+
+        return params;
+    }
+
+    private TextView modernAction(
+            String text,
+            int textColor,
+            int background
+    ) {
+
+        TextView view =
+                makeLabel(
+                        text,
+                        15,
+                        textColor
+                );
+
+        view.setGravity(Gravity.CENTER);
+
+        view.setBackground(
+                strokeBg(
+                        background,
+                        Color.rgb(52, 52, 57),
+                        1,
+                        12
+                )
+        );
+
+        view.setOnTouchListener(
+                (v, event) -> {
+
+                    if (
+                            event.getAction()
+                                    == MotionEvent.ACTION_DOWN
+                    ) {
+
+                        v.setAlpha(0.65f);
+
+                    } else if (
+                            event.getAction()
+                                    == MotionEvent.ACTION_UP
+                    ) {
+
+                        v.setAlpha(1f);
+                    }
+
+                    return false;
+                }
+        );
+
+        return view;
     }
 
     // =========================================================
@@ -1177,14 +1315,17 @@ public class MainActivity extends Activity {
         );
 
         panel.setPadding(
-                dp(18),
-                dp(18),
-                dp(18),
-                dp(12)
+                dp(16),
+                dp(16),
+                dp(16),
+                dp(10)
         );
 
-        panel.setBackgroundColor(
-                Color.BLACK
+        panel.setBackground(
+                roundedBg(
+                        Color.rgb(20, 20, 23),
+                        20
+                )
         );
 
         EditText nameInput =
@@ -1194,183 +1335,72 @@ public class MainActivity extends Activity {
                 getDisplayName(book)
         );
 
-        nameInput.setTextColor(
-                Color.WHITE
-        );
+        nameInput.setTextColor(TEXT_PRIMARY);
 
-        nameInput.setHintTextColor(
-                Color.GRAY
-        );
+        nameInput.setHintTextColor(TEXT_MUTED);
 
         nameInput.setSingleLine(true);
 
-        nameInput.setInputType(
-                InputType.TYPE_CLASS_TEXT
+        nameInput.setTextSize(15);
+
+        nameInput.setPadding(
+                dp(14),
+                0,
+                dp(14),
+                0
+        );
+
+        nameInput.setBackground(
+                strokeBg(
+                        SURFACE_2,
+                        Color.rgb(54, 54, 59),
+                        1,
+                        12
+                )
         );
 
         panel.addView(
                 nameInput,
                 new LinearLayout.LayoutParams(
                         -1,
-                        dp(55)
+                        dp(54)
                 )
         );
 
         TextView rename =
-                new TextView(this);
-
-        rename.setText(
-                "保存书名"
-        );
-
-        rename.setTextSize(16);
-        rename.setTextColor(Color.WHITE);
-
-        rename.setGravity(
-                Gravity.CENTER
-        );
-
-        GradientDrawable renameBg =
-                new GradientDrawable();
-
-        renameBg.setColor(
-                Color.rgb(
-                        50,
-                        50,
-                        50
-                )
-        );
-
-        renameBg.setCornerRadius(
-                dp(8)
-        );
-
-        rename.setBackground(
-                renameBg
-        );
+                modernAction(
+                        "保存书名",
+                        TEXT_PRIMARY,
+                        SURFACE_3
+                );
 
         panel.addView(
                 rename,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(50)
-                )
+                actionParams(50, 10)
         );
 
         TextView changeCover =
-                new TextView(this);
-
-        changeCover.setText(
-                "更换封面"
-        );
-
-        changeCover.setTextSize(16);
-
-        changeCover.setTextColor(
-                Color.rgb(
-                        220,
-                        220,
-                        220
-                )
-        );
-
-        changeCover.setGravity(
-                Gravity.CENTER
-        );
-
-        GradientDrawable coverBg =
-                new GradientDrawable();
-
-        coverBg.setColor(
-                Color.rgb(
-                        35,
-                        35,
-                        35
-                )
-        );
-
-        coverBg.setCornerRadius(
-                dp(8)
-        );
-
-        changeCover.setBackground(
-                coverBg
-        );
-
-        LinearLayout.LayoutParams coverParams =
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(50)
+                modernAction(
+                        "更换封面",
+                        TEXT_SECONDARY,
+                        SURFACE_2
                 );
-
-        coverParams.setMargins(
-                0,
-                dp(8),
-                0,
-                0
-        );
 
         panel.addView(
                 changeCover,
-                coverParams
+                actionParams(50, 5)
         );
 
         TextView delete =
-                new TextView(this);
-
-        delete.setText(
-                "删除书本"
-        );
-
-        delete.setTextSize(16);
-
-        delete.setTextColor(
-                Color.rgb(
-                        210,
-                        210,
-                        210
-                )
-        );
-
-        delete.setGravity(
-                Gravity.CENTER
-        );
-
-        GradientDrawable deleteBg =
-                new GradientDrawable();
-
-        deleteBg.setColor(
-                Color.rgb(
-                        55,
-                        35,
-                        35
-                )
-        );
-
-        deleteBg.setCornerRadius(
-                dp(8)
-        );
-
-        delete.setBackground(
-                deleteBg
-        );
-
-        LinearLayout.LayoutParams deleteParams =
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(50)
+                modernAction(
+                        "删除书本",
+                        Color.rgb(220, 175, 175),
+                        Color.rgb(48, 31, 32)
                 );
-
-        deleteParams.setMargins(
-                0,
-                dp(8),
-                0,
-                0
-        );
 
         panel.addView(
                 delete,
-                deleteParams
+                actionParams(50, 5)
         );
 
         AlertDialog dialog =
@@ -1422,9 +1452,7 @@ public class MainActivity extends Activity {
                                     Intent.ACTION_OPEN_DOCUMENT
                             );
 
-                    intent.setType(
-                            "image/*"
-                    );
+                    intent.setType("image/*");
 
                     intent.addCategory(
                             Intent.CATEGORY_OPENABLE
@@ -1477,15 +1505,9 @@ public class MainActivity extends Activity {
                 book.getName();
 
         sp.edit()
-                .remove(
-                        "display_name_" + id
-                )
-                .remove(
-                        "order_" + id
-                )
-                .remove(
-                        "y_" + id
-                )
+                .remove("display_name_" + id)
+                .remove("order_" + id)
+                .remove("y_" + id)
                 .apply();
 
         removeFromShelfOrder(id);
@@ -1519,7 +1541,6 @@ public class MainActivity extends Activity {
                     name.isEmpty()
                             || name.equals(bookName)
             ) {
-
                 continue;
             }
 
@@ -1533,9 +1554,7 @@ public class MainActivity extends Activity {
         if (result.length() == 0) {
 
             sp.edit()
-                    .remove(
-                            "shelf_order"
-                    )
+                    .remove("shelf_order")
                     .apply();
 
         } else {
@@ -1561,7 +1580,6 @@ public class MainActivity extends Activity {
             if (children != null) {
 
                 for (File child : children) {
-
                     deleteRecursive(child);
                 }
             }
@@ -1697,7 +1715,6 @@ public class MainActivity extends Activity {
                                 a.charAt(ia)
                         )
                 ) {
-
                     ia++;
                 }
 
@@ -1707,7 +1724,6 @@ public class MainActivity extends Activity {
                                 b.charAt(ib)
                         )
                 ) {
-
                     ib++;
                 }
 
@@ -1835,9 +1851,7 @@ public class MainActivity extends Activity {
             ImageView image =
                     new ImageView(this);
 
-            image.setAdjustViewBounds(
-                    true
-            );
+            image.setAdjustViewBounds(true);
 
             image.setScaleType(
                     ImageView.ScaleType.CENTER_CROP
@@ -1866,6 +1880,10 @@ public class MainActivity extends Activity {
                 )
         );
 
+        // -----------------------------------------------------
+        // 阅读器控制层
+        // -----------------------------------------------------
+
         final LinearLayout controls =
                 new LinearLayout(this);
 
@@ -1878,31 +1896,25 @@ public class MainActivity extends Activity {
         );
 
         controls.setPadding(
-                dp(8),
-                dp(8),
-                dp(8),
-                dp(8)
-        );
-
-        GradientDrawable controlsBg =
-                new GradientDrawable();
-
-        controlsBg.setColor(
-                Color.argb(
-                        225,
-                        25,
-                        25,
-                        25
-                )
-        );
-
-        controlsBg.setCornerRadius(
-                dp(12)
+                dp(7),
+                dp(7),
+                dp(7),
+                dp(7)
         );
 
         controls.setBackground(
-                controlsBg
+                roundedBg(
+                        Color.argb(
+                                238,
+                                27,
+                                27,
+                                30
+                        ),
+                        18
+                )
         );
+
+        controls.setElevation(dp(8));
 
         TextView sort =
                 readerButton("图片排序");
@@ -1929,10 +1941,10 @@ public class MainActivity extends Activity {
                 );
 
         controlParams.setMargins(
-                dp(8),
-                dp(8),
-                dp(8),
-                dp(12)
+                dp(10),
+                dp(10),
+                dp(10),
+                dp(14)
         );
 
         readerContainer.addView(
@@ -1968,15 +1980,27 @@ public class MainActivity extends Activity {
                                             == View.VISIBLE
                             ) {
 
-                                controls.setVisibility(
-                                        View.GONE
-                                );
+                                controls.animate()
+                                        .alpha(0f)
+                                        .setDuration(100)
+                                        .withEndAction(() ->
+                                                controls.setVisibility(
+                                                        View.GONE
+                                                )
+                                        )
+                                        .start();
 
                             } else {
 
+                                controls.setAlpha(0f);
                                 controls.setVisibility(
                                         View.VISIBLE
                                 );
+
+                                controls.animate()
+                                        .alpha(1f)
+                                        .setDuration(140)
+                                        .start();
                             }
                         }
 
@@ -1987,7 +2011,7 @@ public class MainActivity extends Activity {
                 }
         );
 
-        // 不再恢复上次阅读位置。
+        // 不恢复上次阅读位置。
         // 每次进入 reader() 都从顶部开始。
 
         sort.setOnClickListener(
@@ -2015,21 +2039,66 @@ public class MainActivity extends Activity {
     ) {
 
         TextView button =
-                new TextView(this);
-
-        button.setText(text);
-        button.setTextSize(13);
-        button.setTextColor(Color.WHITE);
+                makeLabel(
+                        text,
+                        13,
+                        TEXT_PRIMARY
+                );
 
         button.setGravity(
                 Gravity.CENTER
         );
 
         button.setPadding(
-                dp(6),
+                dp(7),
                 dp(10),
-                dp(6),
+                dp(7),
                 dp(10)
+        );
+
+        button.setBackground(
+                roundedBg(
+                        Color.rgb(43, 43, 47),
+                        11
+                )
+        );
+
+        LinearLayout.LayoutParams params =
+                new LinearLayout.LayoutParams(
+                        0,
+                        dp(43),
+                        1
+                );
+
+        params.setMargins(
+                dp(3),
+                0,
+                dp(3),
+                0
+        );
+
+        button.setLayoutParams(params);
+
+        button.setOnTouchListener(
+                (v, event) -> {
+
+                    if (
+                            event.getAction()
+                                    == MotionEvent.ACTION_DOWN
+                    ) {
+
+                        v.setAlpha(0.6f);
+
+                    } else if (
+                            event.getAction()
+                                    == MotionEvent.ACTION_UP
+                    ) {
+
+                        v.setAlpha(1f);
+                    }
+
+                    return false;
+                }
         );
 
         return button;
@@ -2046,9 +2115,7 @@ public class MainActivity extends Activity {
                         Intent.ACTION_OPEN_DOCUMENT
                 );
 
-        intent.setType(
-                "image/*"
-        );
+        intent.setType("image/*");
 
         intent.putExtra(
                 Intent.EXTRA_ALLOW_MULTIPLE,
@@ -2154,8 +2221,7 @@ public class MainActivity extends Activity {
                     book
             );
 
-            pendingCoverDisplayName =
-                    null;
+            pendingCoverDisplayName = null;
 
             showShelf();
         }
@@ -2222,8 +2288,7 @@ public class MainActivity extends Activity {
             String originalName =
                     getFileName(uri);
 
-            String extension =
-                    ".jpg";
+            String extension = ".jpg";
 
             int dot =
                     originalName.lastIndexOf('.');
@@ -2277,9 +2342,7 @@ public class MainActivity extends Activity {
             }
 
             FileOutputStream out =
-                    new FileOutputStream(
-                            target
-                    );
+                    new FileOutputStream(target);
 
             byte[] buffer =
                     new byte[8192];
@@ -2437,20 +2500,21 @@ public class MainActivity extends Activity {
         );
 
         listContainer.setPadding(
-                dp(8),
-                dp(4),
-                dp(8),
-                dp(4)
+                dp(6),
+                dp(3),
+                dp(6),
+                dp(6)
         );
 
         ScrollView scroll =
                 new ScrollView(this);
 
         scroll.setFillViewport(true);
-
-        scroll.addView(
-                listContainer
+        scroll.setBackgroundColor(
+                Color.rgb(16, 16, 18)
         );
+
+        scroll.addView(listContainer);
 
         LinearLayout panel =
                 new LinearLayout(this);
@@ -2466,28 +2530,22 @@ public class MainActivity extends Activity {
                 dp(4)
         );
 
+        panel.setBackgroundColor(
+                Color.rgb(20, 20, 23)
+        );
+
         TextView hint =
-                new TextView(this);
-
-        hint.setText(
-                "长按文件名拖动，可以调整图片顺序"
-        );
-
-        hint.setTextSize(13);
-
-        hint.setTextColor(
-                Color.rgb(
-                        130,
-                        130,
-                        130
-                )
-        );
+                makeLabel(
+                        "长按文件名或右侧图标拖动调整顺序",
+                        13,
+                        TEXT_MUTED
+                );
 
         hint.setPadding(
-                dp(6),
-                dp(2),
-                dp(6),
-                dp(8)
+                dp(7),
+                dp(1),
+                dp(7),
+                dp(10)
         );
 
         panel.addView(
@@ -2555,50 +2613,24 @@ public class MainActivity extends Activity {
 
                             row.setPadding(
                                     dp(8),
-                                    dp(5),
+                                    dp(3),
                                     dp(8),
-                                    dp(5)
-                            );
-
-                            GradientDrawable rowBg =
-                                    new GradientDrawable();
-
-                            rowBg.setColor(
-                                    Color.rgb(
-                                            28,
-                                            28,
-                                            28
-                                    )
-                            );
-
-                            rowBg.setCornerRadius(
-                                    dp(7)
+                                    dp(3)
                             );
 
                             row.setBackground(
-                                    rowBg
+                                    roundedBg(
+                                            SURFACE_2,
+                                            10
+                                    )
                             );
 
                             TextView number =
-                                    new TextView(
-                                            MainActivity.this
+                                    makeLabel(
+                                            String.valueOf(i + 1),
+                                            13,
+                                            TEXT_MUTED
                                     );
-
-                            number.setText(
-                                    String.valueOf(
-                                            i + 1
-                                    )
-                            );
-
-                            number.setTextSize(13);
-
-                            number.setTextColor(
-                                    Color.rgb(
-                                            120,
-                                            120,
-                                            120
-                                    )
-                            );
 
                             number.setGravity(
                                     Gravity.CENTER
@@ -2613,30 +2645,21 @@ public class MainActivity extends Activity {
                             );
 
                             TextView name =
-                                    new TextView(
-                                            MainActivity.this
+                                    makeLabel(
+                                            file.getName(),
+                                            14,
+                                            TEXT_PRIMARY
                                     );
-
-                            name.setText(
-                                    file.getName()
-                            );
-
-                            name.setTextSize(14);
-
-                            name.setTextColor(
-                                    Color.WHITE
-                            );
 
                             name.setGravity(
                                     Gravity.CENTER_VERTICAL
                             );
 
-                            name.setSingleLine(
-                                    true
-                            );
+                            name.setSingleLine(true);
 
                             name.setEllipsize(
-                                    android.text.TextUtils.TruncateAt.MIDDLE
+                                    android.text.TextUtils
+                                            .TruncateAt.MIDDLE
                             );
 
                             row.addView(
@@ -2649,21 +2672,11 @@ public class MainActivity extends Activity {
                             );
 
                             TextView drag =
-                                    new TextView(
-                                            MainActivity.this
+                                    makeLabel(
+                                            "☰",
+                                            19,
+                                            TEXT_MUTED
                                     );
-
-                            drag.setText("☰");
-
-                            drag.setTextSize(20);
-
-                            drag.setTextColor(
-                                    Color.rgb(
-                                            125,
-                                            125,
-                                            125
-                                    )
-                            );
 
                             drag.setGravity(
                                     Gravity.CENTER
@@ -2700,9 +2713,13 @@ public class MainActivity extends Activity {
                                     startDrag =
                                     v -> {
 
-                                        row.setAlpha(
-                                                0.65f
-                                        );
+                                        row.animate()
+                                                .scaleX(0.98f)
+                                                .scaleY(0.98f)
+                                                .setDuration(80)
+                                                .start();
+
+                                        row.setAlpha(0.65f);
 
                                         View.DragShadowBuilder
                                                 shadow =
@@ -2773,15 +2790,9 @@ public class MainActivity extends Activity {
                                                 ) {
 
                                                     row.animate()
-                                                            .scaleX(
-                                                                    0.97f
-                                                            )
-                                                            .scaleY(
-                                                                    0.97f
-                                                            )
-                                                            .setDuration(
-                                                                    80
-                                                            )
+                                                            .scaleX(0.97f)
+                                                            .scaleY(0.97f)
+                                                            .setDuration(80)
                                                             .start();
                                                 }
 
@@ -2793,9 +2804,7 @@ public class MainActivity extends Activity {
                                                 row.animate()
                                                         .scaleX(1f)
                                                         .scaleY(1f)
-                                                        .setDuration(
-                                                                80
-                                                        )
+                                                        .setDuration(80)
                                                         .start();
 
                                                 return true;
@@ -2858,9 +2867,7 @@ public class MainActivity extends Activity {
                                                         .scaleX(1f)
                                                         .scaleY(1f)
                                                         .alpha(1f)
-                                                        .setDuration(
-                                                                100
-                                                        )
+                                                        .setDuration(100)
                                                         .start();
 
                                                 return true;
@@ -2915,14 +2922,14 @@ public class MainActivity extends Activity {
         );
 
         panel.setPadding(
-                dp(10),
-                dp(10),
-                dp(10),
-                dp(10)
+                dp(8),
+                dp(8),
+                dp(8),
+                dp(8)
         );
 
         panel.setBackgroundColor(
-                Color.BLACK
+                Color.rgb(20, 20, 23)
         );
 
         ScrollView scroll =
@@ -2969,9 +2976,7 @@ public class MainActivity extends Activity {
                         ArrayList<File> current =
                                 images(book);
 
-                        for (
-                                File file : current
-                        ) {
+                        for (File file : current) {
 
                             final File targetFile =
                                     file;
@@ -2990,10 +2995,17 @@ public class MainActivity extends Activity {
                             );
 
                             row.setPadding(
-                                    dp(4),
                                     dp(5),
-                                    dp(4),
+                                    dp(5),
+                                    dp(5),
                                     dp(5)
+                            );
+
+                            row.setBackground(
+                                    roundedBg(
+                                            SURFACE_2,
+                                            10
+                                    )
                             );
 
                             ImageView image =
@@ -3012,28 +3024,27 @@ public class MainActivity extends Activity {
                             row.addView(
                                     image,
                                     new LinearLayout.LayoutParams(
-                                            dp(70),
-                                            dp(90)
+                                            dp(66),
+                                            dp(86)
                                     )
                             );
 
                             TextView fileName =
-                                    new TextView(
-                                            MainActivity.this
+                                    makeLabel(
+                                            file.getName(),
+                                            13,
+                                            TEXT_PRIMARY
                                     );
-
-                            fileName.setText(
-                                    file.getName()
-                            );
-
-                            fileName.setTextSize(13);
-
-                            fileName.setTextColor(
-                                    Color.WHITE
-                            );
 
                             fileName.setGravity(
                                     Gravity.CENTER_VERTICAL
+                            );
+
+                            fileName.setSingleLine(true);
+
+                            fileName.setEllipsize(
+                                    android.text.TextUtils
+                                            .TruncateAt.MIDDLE
                             );
 
                             LinearLayout.LayoutParams
@@ -3045,7 +3056,7 @@ public class MainActivity extends Activity {
                                     );
 
                             nameParams.setMargins(
-                                    dp(10),
+                                    dp(11),
                                     0,
                                     dp(8),
                                     0
@@ -3057,29 +3068,27 @@ public class MainActivity extends Activity {
                             );
 
                             TextView delete =
-                                    new TextView(
-                                            MainActivity.this
+                                    modernAction(
+                                            "删除",
+                                            Color.rgb(
+                                                    220,
+                                                    175,
+                                                    175
+                                            ),
+                                            Color.rgb(
+                                                    48,
+                                                    31,
+                                                    32
+                                            )
                                     );
 
-                            delete.setText(
-                                    "删除"
-                            );
-
-                            delete.setTextSize(14);
-
-                            delete.setTextColor(
-                                    Color.WHITE
-                            );
-
-                            delete.setGravity(
-                                    Gravity.CENTER
-                            );
+                            delete.setTextSize(13);
 
                             row.addView(
                                     delete,
                                     new LinearLayout.LayoutParams(
                                             dp(60),
-                                            dp(45)
+                                            dp(42)
                                     )
                             );
 
@@ -3099,7 +3108,6 @@ public class MainActivity extends Activity {
                                                     after
                                             );
 
-                                            // 立即刷新阅读器
                                             dialog.dismiss();
                                             reader(book);
 
@@ -3114,12 +3122,23 @@ public class MainActivity extends Activity {
                                     }
                             );
 
-                            imageList.addView(
-                                    row,
+                            LinearLayout.LayoutParams
+                                    rowParams =
                                     new LinearLayout.LayoutParams(
                                             -1,
-                                            dp(100)
-                                    )
+                                            dp(96)
+                                    );
+
+                            rowParams.setMargins(
+                                    0,
+                                    dp(3),
+                                    0,
+                                    dp(3)
+                            );
+
+                            imageList.addView(
+                                    row,
+                                    rowParams
                             );
                         }
                     }
