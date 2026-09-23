@@ -1413,8 +1413,6 @@ public class MainActivity extends Activity {
 
         getCoverDir(book).mkdirs();
 
-        // 创建后只返回书架。
-        // 不自动进入阅读器。
         showShelf();
     }
 
@@ -1606,7 +1604,6 @@ public class MainActivity extends Activity {
 
                                         currentBook = null;
 
-                                        // 关闭外层“管理书本”窗口。
                                         dialog.dismiss();
 
                                         showShelf();
@@ -1615,13 +1612,6 @@ public class MainActivity extends Activity {
                             .show();
                 }
         );
-
-        // =====================================================
-        // 修复：
-        // 原来的管理书本 Dialog 没有透明 Window 背景，
-        // Android 默认 Dialog 背景会在我们的圆角面板
-        // 上下留下白色区域。
-        // =====================================================
 
         dialog.setOnShowListener(
                 d -> {
@@ -2027,10 +2017,6 @@ public class MainActivity extends Activity {
                 )
         );
 
-        // -----------------------------------------------------
-        // 阅读器控制层
-        // -----------------------------------------------------
-
         final LinearLayout controls =
                 new LinearLayout(this);
 
@@ -2162,9 +2148,6 @@ public class MainActivity extends Activity {
                     return false;
                 }
         );
-
-        // 不恢复上次阅读位置。
-        // 每次进入 reader() 都从顶部开始。
 
         sort.setOnClickListener(
                 v -> sortImages(book)
@@ -2808,7 +2791,6 @@ public class MainActivity extends Activity {
 
                             // -------------------------------------------------
                             // 小缩略图
-                            // 只用于辨认图片
                             // -------------------------------------------------
 
                             ImageView thumbnail =
@@ -3075,44 +3057,72 @@ public class MainActivity extends Activity {
                                                     ) {
 
                                                         // =================================================
-                                                        // 修复图片排序方向 Bug
+                                                        // v2.18 双向拖拽修复
                                                         //
-                                                        // 原来的代码：
-                                                        // fromIndex < toIndex 时 toIndex--
+                                                        // 规则：
+                                                        // 从上往下拖 -> 放到目标后面
+                                                        // 从下往上拖 -> 放到目标前面
                                                         //
-                                                        // 会导致：
-                                                        // 1 → 2 时重新插回 1 的位置，
-                                                        // 看起来就像完全没有移动。
+                                                        // 例如：
                                                         //
-                                                        // 现在采用真正的：
-                                                        // 删除原位置 → 重新查找目标 → 插入目标之前
+                                                        // [1, 2]
+                                                        // 1 -> 2
+                                                        // 结果：[2, 1]
                                                         //
-                                                        // 因此上下两个方向完全对称。
+                                                        // [1, 2]
+                                                        // 2 -> 1
+                                                        // 结果：[2, 1]
+                                                        //
+                                                        // 1 -> 3
+                                                        // [1, 2, 3]
+                                                        // 结果：[2, 3, 1]
+                                                        //
+                                                        // 3 -> 1
+                                                        // [1, 2, 3]
+                                                        // 结果：[3, 1, 2]
                                                         // =================================================
 
                                                         order.remove(
                                                                 fromIndex
                                                         );
 
-                                                        int newToIndex =
+                                                        int targetIndex =
                                                                 order.indexOf(
                                                                         file
                                                                 );
 
                                                         if (
-                                                                newToIndex >= 0
+                                                                targetIndex >= 0
                                                         ) {
 
-                                                            order.add(
-                                                                    newToIndex,
-                                                                    from
-                                                            );
+                                                            if (
+                                                                    fromIndex
+                                                                            < toIndex
+                                                            ) {
+
+                                                                // 原来在目标上方。
+                                                                // 删除以后目标向前移动了一位，
+                                                                // 所以把拖动项放到目标后面。
+                                                                order.add(
+                                                                        targetIndex + 1,
+                                                                        from
+                                                                );
+
+                                                            } else {
+
+                                                                // 原来在目标下方，
+                                                                // 直接放到目标前面。
+                                                                order.add(
+                                                                        targetIndex,
+                                                                        from
+                                                                );
+                                                            }
+
+                                                            firstRender[0] =
+                                                                    false;
+
+                                                            refresh[0].run();
                                                         }
-
-                                                        firstRender[0] =
-                                                                false;
-
-                                                        refresh[0].run();
                                                     }
                                                 }
 
