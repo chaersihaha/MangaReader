@@ -16,8 +16,6 @@ import android.text.InputType;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.WindowInsets;
-import android.view.WindowInsetsController;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -48,17 +46,17 @@ public class MainActivity extends Activity {
 
     private String pendingCoverDisplayName = null;
 
+    // 书架拖动排序
+    private File draggingBook = null;
+    private boolean isDraggingBook = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         sp = getSharedPreferences("meta", MODE_PRIVATE);
 
-        booksDir = new File(
-                getFilesDir(),
-                "books"
-        );
-
+        booksDir = new File(getFilesDir(), "books");
         booksDir.mkdirs();
 
         setTitle("GPT漫画");
@@ -66,75 +64,44 @@ public class MainActivity extends Activity {
         showShelf();
     }
 
+    private int dp(int value) {
+        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
     private void fullscreen() {
+
         if (Build.VERSION.SDK_INT >= 30) {
 
-            WindowInsetsController controller =
-                    getWindow().getInsetsController();
+            getWindow().setDecorFitsSystemWindows(false);
 
-            if (controller != null) {
+            if (getWindow().getInsetsController() != null) {
 
-                controller.hide(
-                        WindowInsets.Type.statusBars()
-                                | WindowInsets.Type.navigationBars()
+                getWindow().getInsetsController().hide(
+                        android.view.WindowInsets.Type.statusBars()
+                                | android.view.WindowInsets.Type.navigationBars()
                 );
 
-                controller.setSystemBarsBehavior(
-                        WindowInsetsController
-                                .BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                getWindow().getInsetsController().setSystemBarsBehavior(
+                        android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                 );
             }
 
         } else {
 
-            getWindow()
-                    .getDecorView()
-                    .setSystemUiVisibility(
-                            View.SYSTEM_UI_FLAG_FULLSCREEN
-                                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                                    | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                                    | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                    );
+            getWindow().getDecorView().setSystemUiVisibility(
+                    View.SYSTEM_UI_FLAG_FULLSCREEN
+                            | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                            | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                            | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+            );
         }
     }
 
-    @Override
-    public void onWindowFocusChanged(boolean hasFocus) {
-        super.onWindowFocusChanged(hasFocus);
-    }
-
-    private int dp(int value) {
-        return (int) (
-                value
-                        * getResources()
-                        .getDisplayMetrics()
-                        .density
-                        + 0.5f
-        );
-    }
-
-    private TextView tv(String text, int size) {
-
-        TextView view = new TextView(this);
-
-        view.setText(text);
-        view.setTextSize(size);
-        view.setTextColor(Color.WHITE);
-        view.setGravity(Gravity.CENTER_VERTICAL);
-
-        view.setPadding(
-                dp(16),
-                dp(12),
-                dp(16),
-                dp(12)
-        );
-
-        return view;
-    }
-
     private void base() {
+
+        fullscreen();
 
         root = new LinearLayout(this);
 
@@ -151,24 +118,10 @@ public class MainActivity extends Activity {
 
     private String getDisplayName(File book) {
 
-        String key =
-                "display_name_" +
-                        book.getName();
-
-        String name =
-                sp.getString(
-                        key,
-                        null
-                );
-
-        if (
-                name == null ||
-                        name.trim().isEmpty()
-        ) {
-            return book.getName();
-        }
-
-        return name;
+        return sp.getString(
+                "display_name_" + book.getName(),
+                book.getName()
+        );
     }
 
     private void setDisplayName(
@@ -176,43 +129,20 @@ public class MainActivity extends Activity {
             String name
     ) {
 
-        String key =
-                "display_name_" +
-                        book.getName();
-
-        if (
-                name == null ||
-                        name.trim().isEmpty()
-        ) {
-
-            sp.edit()
-                    .remove(key)
-                    .apply();
-
-        } else {
-
-            sp.edit()
-                    .putString(
-                            key,
-                            name.trim()
-                    )
-                    .apply();
-        }
+        sp.edit()
+                .putString(
+                        "display_name_" + book.getName(),
+                        name
+                )
+                .apply();
     }
 
     private File getCoverDir(File book) {
 
-        File dir =
-                new File(
-                        book,
-                        "cover"
-                );
-
-        if (!dir.exists()) {
-            dir.mkdirs();
-        }
-
-        return dir;
+        return new File(
+                book,
+                "cover"
+        );
     }
 
     private File getCoverFile(File book) {
@@ -225,17 +155,12 @@ public class MainActivity extends Activity {
 
     private boolean hasCover(File book) {
 
-        File file =
-                getCoverFile(book);
-
-        return file.exists()
-                && file.isFile()
-                && file.length() > 0;
+        return getCoverFile(book).exists();
     }
 
-    // ============================================================
-    // GPT漫画 主界面
-    // ============================================================
+    // =========================================================
+    // 书架
+    // =========================================================
 
     private void showShelf() {
 
@@ -243,16 +168,11 @@ public class MainActivity extends Activity {
 
         base();
 
-        /*
-         * 顶部只保留非常简单的品牌区域。
-         *
-         * 不做复杂导航栏，不占用太多空间。
-         */
         LinearLayout header =
                 new LinearLayout(this);
 
         header.setOrientation(
-                LinearLayout.HORIZONTAL
+                LinearLayout.VERTICAL
         );
 
         header.setGravity(
@@ -260,10 +180,10 @@ public class MainActivity extends Activity {
         );
 
         header.setPadding(
-                dp(18),
-                dp(8),
-                dp(18),
-                dp(6)
+                dp(20),
+                dp(10),
+                dp(20),
+                dp(8)
         );
 
         header.setBackgroundColor(
@@ -273,59 +193,37 @@ public class MainActivity extends Activity {
         TextView title =
                 new TextView(this);
 
-        title.setText(
-                "GPT漫画"
-        );
-
-        title.setTextSize(
-                21
-        );
-
-        title.setTextColor(
-                Color.WHITE
-        );
+        title.setText("GPT漫画");
+        title.setTextSize(21);
+        title.setTextColor(Color.WHITE);
 
         title.setTypeface(
                 Typeface.DEFAULT,
                 Typeface.BOLD
         );
 
-        title.setGravity(
-                Gravity.CENTER_VERTICAL
-        );
-
         header.addView(
                 title,
                 new LinearLayout.LayoutParams(
-                        -2,
-                        -1
+                        -1,
+                        -2
                 )
         );
 
         TextView subtitle =
                 new TextView(this);
 
-        subtitle.setText(
-                "  我的书库"
-        );
-
-        subtitle.setTextSize(
-                13
-        );
-
+        subtitle.setText("我的书库");
+        subtitle.setTextSize(12);
         subtitle.setTextColor(
-                Color.GRAY
-        );
-
-        subtitle.setGravity(
-                Gravity.CENTER_VERTICAL
+                Color.rgb(125, 125, 125)
         );
 
         header.addView(
                 subtitle,
                 new LinearLayout.LayoutParams(
-                        -2,
-                        -1
+                        -1,
+                        -2
                 )
         );
 
@@ -333,16 +231,10 @@ public class MainActivity extends Activity {
                 header,
                 new LinearLayout.LayoutParams(
                         -1,
-                        dp(58)
+                        dp(68)
                 )
         );
 
-        /*
-         * 使用 FrameLayout 作为书架容器。
-         *
-         * 这样右下角按钮是真正的悬浮按钮，
-         * 不需要 TranslationX / TranslationY 硬挪位置。
-         */
         FrameLayout shelfContainer =
                 new FrameLayout(this);
 
@@ -367,86 +259,27 @@ public class MainActivity extends Activity {
         );
 
         shelfScroll.setFillViewport(true);
+        shelfScroll.setClipToPadding(false);
 
         shelf =
                 new LinearLayout(this);
 
         shelf.setOrientation(
-                LinearLayout.HORIZONTAL
-        );
-
-        shelf.setGravity(
-                Gravity.TOP
+                LinearLayout.VERTICAL
         );
 
         shelf.setPadding(
-                dp(7),
+                dp(8),
                 dp(4),
-                dp(7),
-                dp(84)
+                dp(8),
+                dp(100)
         );
 
         shelf.setBackgroundColor(
                 Color.BLACK
         );
 
-        LinearLayout leftColumn =
-                new LinearLayout(this);
-
-        leftColumn.setOrientation(
-                LinearLayout.VERTICAL
-        );
-
-        leftColumn.setPadding(
-                dp(4),
-                dp(4),
-                dp(4),
-                dp(4)
-        );
-
-        leftColumn.setBackgroundColor(
-                Color.BLACK
-        );
-
-        LinearLayout rightColumn =
-                new LinearLayout(this);
-
-        rightColumn.setOrientation(
-                LinearLayout.VERTICAL
-        );
-
-        rightColumn.setPadding(
-                dp(4),
-                dp(4),
-                dp(4),
-                dp(4)
-        );
-
-        rightColumn.setBackgroundColor(
-                Color.BLACK
-        );
-
-        shelf.addView(
-                leftColumn,
-                new LinearLayout.LayoutParams(
-                        0,
-                        -2,
-                        1
-                )
-        );
-
-        shelf.addView(
-                rightColumn,
-                new LinearLayout.LayoutParams(
-                        0,
-                        -2,
-                        1
-                )
-        );
-
-        shelfScroll.addView(
-                shelf
-        );
+        shelfScroll.addView(shelf);
 
         shelfContainer.addView(
                 shelfScroll,
@@ -456,43 +289,29 @@ public class MainActivity extends Activity {
                 )
         );
 
-        /*
-         * 右下角悬浮创建按钮。
-         */
         TextView create =
                 new TextView(this);
 
-        create.setText("＋");
-        create.setTextSize(28);
+        create.setText("+");
+        create.setTextSize(27);
         create.setTextColor(Color.WHITE);
         create.setGravity(Gravity.CENTER);
-
-        create.setTypeface(
-                Typeface.DEFAULT,
-                Typeface.BOLD
-        );
 
         GradientDrawable createBg =
                 new GradientDrawable();
 
         createBg.setColor(
-                Color.rgb(
-                        48,
-                        48,
-                        48
-                )
+                Color.rgb(42, 42, 42)
         );
 
         createBg.setShape(
                 GradientDrawable.OVAL
         );
 
-        create.setBackground(
-                createBg
-        );
+        create.setBackground(createBg);
 
         create.setElevation(
-                dp(8)
+                dp(10)
         );
 
         create.setOnClickListener(
@@ -503,8 +322,7 @@ public class MainActivity extends Activity {
                 new FrameLayout.LayoutParams(
                         dp(58),
                         dp(58),
-                        Gravity.BOTTOM
-                                | Gravity.END
+                        Gravity.BOTTOM | Gravity.END
                 );
 
         createParams.setMargins(
@@ -522,17 +340,73 @@ public class MainActivity extends Activity {
         File[] books =
                 booksDir.listFiles();
 
-        if (books != null) {
+        if (books == null) {
 
-            ArrayList<File> list =
-                    new ArrayList<>();
+            showEmptyShelf();
 
-            for (File book : books) {
+            return;
+        }
 
-                if (book.isDirectory()) {
-                    list.add(book);
-                }
+        ArrayList<File> list =
+                new ArrayList<>();
+
+        for (File book : books) {
+
+            if (book.isDirectory()) {
+                list.add(book);
             }
+        }
+
+        if (list.isEmpty()) {
+
+            showEmptyShelf();
+
+            return;
+        }
+
+        loadShelfOrder(list);
+
+        rebuildShelf(list);
+    }
+
+    private void showEmptyShelf() {
+
+        TextView empty =
+                new TextView(this);
+
+        empty.setText(
+                "书库还是空的\n\n点击右下角 ＋ 添加第一本漫画"
+        );
+
+        empty.setTextSize(14);
+        empty.setTextColor(
+                Color.rgb(105, 105, 105)
+        );
+
+        empty.setGravity(
+                Gravity.CENTER
+        );
+
+        shelf.addView(
+                empty,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(280)
+                )
+        );
+    }
+
+    private void loadShelfOrder(
+            ArrayList<File> list
+    ) {
+
+        String saved =
+                sp.getString(
+                        "shelf_order",
+                        ""
+                );
+
+        if (saved.isEmpty()) {
 
             Collections.sort(
                     list,
@@ -543,48 +417,161 @@ public class MainActivity extends Activity {
                             )
             );
 
-            /*
-             * 不在这里读取 getHeight()。
-             *
-             * Android 在尚未完成 measure/layout 时，
-             * getHeight() 很可能全部是 0，
-             * 导致所有书被塞进同一列。
-             *
-             * 这里采用稳定的交替分栏。
-             *
-             * 两列内部仍然是自然高度排列，
-             * 因此不会发生封面互相覆盖。
-             */
-            for (
-                    int i = 0;
-                    i < list.size();
-                    i++
-            ) {
+            return;
+        }
 
-                File book =
-                        list.get(i);
+        ArrayList<File> ordered =
+                new ArrayList<>();
 
-                if (i % 2 == 0) {
+        Set<String> used =
+                new HashSet<>();
 
-                    addBook(
-                            leftColumn,
-                            book
-                    );
+        String[] names =
+                saved.split("\\|");
 
-                } else {
+        for (String name : names) {
 
-                    addBook(
-                            rightColumn,
-                            book
-                    );
+            for (File book : list) {
+
+                if (
+                        book.getName()
+                                .equals(name)
+                ) {
+
+                    ordered.add(book);
+                    used.add(name);
+
+                    break;
                 }
+            }
+        }
+
+        ArrayList<File> remaining =
+                new ArrayList<>();
+
+        for (File book : list) {
+
+            if (!used.contains(book.getName())) {
+                remaining.add(book);
+            }
+        }
+
+        Collections.sort(
+                remaining,
+                (a, b) ->
+                        naturalCompare(
+                                a.getName(),
+                                b.getName()
+                        )
+        );
+
+        ordered.addAll(
+                remaining
+        );
+
+        list.clear();
+        list.addAll(ordered);
+
+        // 清理已经不存在的书本 ID
+        saveShelfOrder(list);
+    }
+
+    private void saveShelfOrder(
+            ArrayList<File> books
+    ) {
+
+        StringBuilder order =
+                new StringBuilder();
+
+        for (File book : books) {
+
+            if (order.length() > 0) {
+                order.append("|");
+            }
+
+            order.append(
+                    book.getName()
+            );
+        }
+
+        sp.edit()
+                .putString(
+                        "shelf_order",
+                        order.toString()
+                )
+                .apply();
+    }
+
+    private void rebuildShelf(
+            ArrayList<File> books
+    ) {
+
+        shelf.removeAllViews();
+
+        for (
+                int i = 0;
+                i < books.size();
+                i += 2
+        ) {
+
+            LinearLayout row =
+                    new LinearLayout(this);
+
+            row.setOrientation(
+                    LinearLayout.HORIZONTAL
+            );
+
+            row.setGravity(
+                    Gravity.TOP
+            );
+
+            row.setPadding(
+                    dp(2),
+                    dp(3),
+                    dp(2),
+                    dp(3)
+            );
+
+            shelf.addView(
+                    row,
+                    new LinearLayout.LayoutParams(
+                            -1,
+                            -2
+                    )
+            );
+
+            addBook(
+                    row,
+                    books.get(i)
+            );
+
+            if (i + 1 < books.size()) {
+
+                addBook(
+                        row,
+                        books.get(i + 1)
+                );
+
+            } else {
+
+                View empty =
+                        new View(this);
+
+                row.addView(
+                        empty,
+                        new LinearLayout.LayoutParams(
+                                0,
+                                1,
+                                1
+                        )
+                );
             }
         }
     }
 
     private void addBook(
-            LinearLayout column,
-            File book
+            LinearLayout row,
+            final File book
     ) {
 
         LinearLayout item =
@@ -598,35 +585,43 @@ public class MainActivity extends Activity {
                 Gravity.CENTER_HORIZONTAL
         );
 
-        item.setBackgroundColor(
-                Color.BLACK
-        );
-
         item.setPadding(
-                dp(3),
-                dp(3),
-                dp(3),
+                dp(5),
+                dp(5),
+                dp(5),
                 dp(5)
         );
 
-        column.addView(
+        GradientDrawable itemBg =
+                new GradientDrawable();
+
+        itemBg.setColor(
+                Color.BLACK
+        );
+
+        itemBg.setCornerRadius(
+                dp(7)
+        );
+
+        item.setBackground(
+                itemBg
+        );
+
+        row.addView(
                 item,
                 new LinearLayout.LayoutParams(
-                        -1,
-                        -2
+                        0,
+                        -2,
+                        1
                 )
         );
 
         ImageView coverView =
                 new ImageView(this);
 
-        /*
-         * 不限制封面高度。
-         *
-         * 宽度根据当前列决定，
-         * 高度根据原始图片比例自动计算。
-         */
-        coverView.setAdjustViewBounds(true);
+        coverView.setAdjustViewBounds(
+                true
+        );
 
         coverView.setScaleType(
                 ImageView.ScaleType.FIT_CENTER
@@ -634,24 +629,6 @@ public class MainActivity extends Activity {
 
         coverView.setBackgroundColor(
                 Color.BLACK
-        );
-
-        LinearLayout.LayoutParams coverParams =
-                new LinearLayout.LayoutParams(
-                        -1,
-                        -2
-                );
-
-        coverParams.setMargins(
-                0,
-                0,
-                0,
-                dp(5)
-        );
-
-        item.addView(
-                coverView,
-                coverParams
         );
 
         if (hasCover(book)) {
@@ -665,56 +642,274 @@ public class MainActivity extends Activity {
         } else {
 
             TextView noCover =
-                    tv(
-                            "暂无封面",
-                            14
-                    );
+                    new TextView(this);
+
+            noCover.setText(
+                    "暂无封面"
+            );
+
+            noCover.setTextSize(14);
+
+            noCover.setTextColor(
+                    Color.rgb(
+                            115,
+                            115,
+                            115
+                    )
+            );
 
             noCover.setGravity(
                     Gravity.CENTER
             );
 
-            noCover.setTextColor(
-                    Color.GRAY
-            );
+            GradientDrawable noCoverBg =
+                    new GradientDrawable();
 
-            noCover.setBackgroundColor(
+            noCoverBg.setColor(
                     Color.rgb(
-                            18,
-                            18,
-                            18
+                            20,
+                            20,
+                            20
                     )
             );
 
-            item.removeView(
-                    coverView
+            noCoverBg.setCornerRadius(
+                    dp(7)
+            );
+
+            noCover.setBackground(
+                    noCoverBg
             );
 
             item.addView(
                     noCover,
                     new LinearLayout.LayoutParams(
                             -1,
-                            dp(180)
+                            dp(170)
                     )
             );
+
+            setupBookTouch(
+                    item,
+                    book
+            );
+
+            return;
         }
 
-        /*
-         * 单击封面：
-         * 打开操作窗口。
-         */
-        item.setOnClickListener(
-                v -> showBookMenu(book)
+        LinearLayout.LayoutParams coverParams =
+                new LinearLayout.LayoutParams(
+                        -1,
+                        -2
+                );
+
+        coverParams.setMargins(
+                0,
+                0,
+                0,
+                dp(3)
         );
 
-        /*
-         * 长按故意不设置。
-         */
+        item.addView(
+                coverView,
+                coverParams
+        );
+
+        setupBookTouch(
+                item,
+                book
+        );
     }
 
-    // ============================================================
-    // 点击书籍后的操作窗口
-    // ============================================================
+    private void setupBookTouch(
+            final View item,
+            final File book
+    ) {
+
+        item.setOnClickListener(
+                v -> {
+
+                    if (isDraggingBook) {
+                        return;
+                    }
+
+                    showBookMenu(book);
+                }
+        );
+
+        item.setOnLongClickListener(
+                v -> {
+
+                    isDraggingBook = true;
+                    draggingBook = book;
+
+                    v.animate()
+                            .scaleX(1.035f)
+                            .scaleY(1.035f)
+                            .setDuration(120)
+                            .start();
+
+                    v.setAlpha(0.82f);
+
+                    View.DragShadowBuilder shadow =
+                            new View.DragShadowBuilder(v);
+
+                    if (Build.VERSION.SDK_INT >= 24) {
+
+                        v.startDragAndDrop(
+                                null,
+                                shadow,
+                                book,
+                                0
+                        );
+
+                    } else {
+
+                        v.startDrag(
+                                null,
+                                shadow,
+                                book,
+                                0
+                        );
+                    }
+
+                    return true;
+                }
+        );
+
+        item.setOnDragListener(
+                (v, event) -> {
+
+                    switch (
+                            event.getAction()
+                    ) {
+
+                        case android.view.DragEvent.ACTION_DRAG_STARTED:
+
+                            return event.getLocalState()
+                                    instanceof File;
+
+                        case android.view.DragEvent.ACTION_DRAG_ENTERED:
+
+                            if (
+                                    draggingBook != null
+                                            && draggingBook != book
+                            ) {
+
+                                v.animate()
+                                        .scaleX(0.97f)
+                                        .scaleY(0.97f)
+                                        .setDuration(100)
+                                        .start();
+                            }
+
+                            return true;
+
+                        case android.view.DragEvent.ACTION_DRAG_EXITED:
+
+                            v.animate()
+                                    .scaleX(1f)
+                                    .scaleY(1f)
+                                    .setDuration(100)
+                                    .start();
+
+                            return true;
+
+                        case android.view.DragEvent.ACTION_DROP:
+
+                            if (
+                                    draggingBook != null
+                                            && draggingBook != book
+                            ) {
+
+                                swapShelfBooks(
+                                        draggingBook,
+                                        book
+                                );
+                            }
+
+                            return true;
+
+                        case android.view.DragEvent.ACTION_DRAG_ENDED:
+
+                            v.animate()
+                                    .scaleX(1f)
+                                    .scaleY(1f)
+                                    .alpha(1f)
+                                    .setDuration(120)
+                                    .start();
+
+                            isDraggingBook = false;
+                            draggingBook = null;
+
+                            return true;
+                    }
+
+                    return true;
+                }
+        );
+    }
+
+    private void swapShelfBooks(
+            File fromBook,
+            File toBook
+    ) {
+
+        File[] files =
+                booksDir.listFiles();
+
+        if (files == null) {
+            return;
+        }
+
+        ArrayList<File> books =
+                new ArrayList<>();
+
+        for (File file : files) {
+
+            if (file.isDirectory()) {
+                books.add(file);
+            }
+        }
+
+        loadShelfOrder(books);
+
+        int from =
+                books.indexOf(fromBook);
+
+        int to =
+                books.indexOf(toBook);
+
+        if (
+                from < 0
+                        || to < 0
+                        || from == to
+        ) {
+
+            return;
+        }
+
+        Collections.swap(
+                books,
+                from,
+                to
+        );
+
+        saveShelfOrder(
+                books
+        );
+
+        rebuildShelf(
+                books
+        );
+
+        isDraggingBook = false;
+        draggingBook = null;
+    }
+
+    // =========================================================
+    // 书籍操作菜单
+    // =========================================================
 
     private void showBookMenu(
             final File book
@@ -727,15 +922,11 @@ public class MainActivity extends Activity {
                 LinearLayout.VERTICAL
         );
 
-        panel.setGravity(
-                Gravity.CENTER_HORIZONTAL
-        );
-
         panel.setPadding(
                 dp(18),
                 dp(18),
                 dp(18),
-                dp(8)
+                dp(12)
         );
 
         panel.setBackgroundColor(
@@ -745,14 +936,12 @@ public class MainActivity extends Activity {
         ImageView cover =
                 new ImageView(this);
 
-        cover.setAdjustViewBounds(true);
+        cover.setAdjustViewBounds(
+                true
+        );
 
         cover.setScaleType(
                 ImageView.ScaleType.FIT_CENTER
-        );
-
-        cover.setBackgroundColor(
-                Color.BLACK
         );
 
         if (hasCover(book)) {
@@ -762,31 +951,25 @@ public class MainActivity extends Activity {
                             getCoverFile(book)
                     )
             );
+
+            panel.addView(
+                    cover,
+                    new LinearLayout.LayoutParams(
+                            -1,
+                            dp(220)
+                    )
+            );
         }
 
-        LinearLayout.LayoutParams coverParams =
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(220)
-                );
-
-        coverParams.setMargins(
-                0,
-                0,
-                0,
-                dp(12)
-        );
-
-        panel.addView(
-                cover,
-                coverParams
-        );
-
         TextView name =
-                tv(
-                        getDisplayName(book),
-                        19
-                );
+                new TextView(this);
+
+        name.setText(
+                getDisplayName(book)
+        );
+
+        name.setTextSize(19);
+        name.setTextColor(Color.WHITE);
 
         name.setGravity(
                 Gravity.CENTER
@@ -799,9 +982,9 @@ public class MainActivity extends Activity {
 
         name.setPadding(
                 dp(8),
-                dp(4),
+                dp(12),
                 dp(8),
-                dp(16)
+                dp(12)
         );
 
         panel.addView(
@@ -812,17 +995,24 @@ public class MainActivity extends Activity {
                 )
         );
 
-        TextView enter =
-                tv(
-                        "进入阅读",
-                        17
-                );
+        TextView read =
+                new TextView(this);
 
-        enter.setGravity(
+        read.setText(
+                "进入阅读"
+        );
+
+        read.setTextSize(17);
+        read.setTextColor(Color.WHITE);
+
+        read.setGravity(
                 Gravity.CENTER
         );
 
-        enter.setBackgroundColor(
+        GradientDrawable readBg =
+                new GradientDrawable();
+
+        readBg.setColor(
                 Color.rgb(
                         55,
                         55,
@@ -830,63 +1020,93 @@ public class MainActivity extends Activity {
                 )
         );
 
-        panel.addView(
-                enter,
+        readBg.setCornerRadius(
+                dp(8)
+        );
+
+        read.setBackground(
+                readBg
+        );
+
+        LinearLayout.LayoutParams readParams =
                 new LinearLayout.LayoutParams(
                         -1,
                         dp(52)
-                )
+                );
+
+        readParams.setMargins(
+                0,
+                dp(5),
+                0,
+                dp(5)
         );
 
-        View spacer1 =
-                new View(this);
-
         panel.addView(
-                spacer1,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(8)
-                )
+                read,
+                readParams
         );
 
         TextView manage =
-                tv(
-                        "管理书本",
-                        17
-                );
+                new TextView(this);
+
+        manage.setText(
+                "管理书本"
+        );
+
+        manage.setTextSize(17);
+        manage.setTextColor(
+                Color.rgb(
+                        220,
+                        220,
+                        220
+                )
+        );
 
         manage.setGravity(
                 Gravity.CENTER
         );
 
-        manage.setBackgroundColor(
+        GradientDrawable manageBg =
+                new GradientDrawable();
+
+        manageBg.setColor(
                 Color.rgb(
-                        45,
-                        45,
-                        45
+                        35,
+                        35,
+                        35
                 )
+        );
+
+        manageBg.setCornerRadius(
+                dp(8)
+        );
+
+        manage.setBackground(
+                manageBg
+        );
+
+        LinearLayout.LayoutParams manageParams =
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(52)
+                );
+
+        manageParams.setMargins(
+                0,
+                dp(5),
+                0,
+                dp(5)
         );
 
         panel.addView(
                 manage,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(52)
-                )
+                manageParams
         );
 
-        /*
-         * 用数组保存 Dialog。
-         *
-         * 点击按钮时先 dismiss，
-         * 再切换页面。
-         *
-         * 这就是本次重点修复的地方。
-         */
         final AlertDialog[] bookDialog =
                 new AlertDialog[1];
 
-        bookDialog[0] =
+        AlertDialog dialog =
                 new AlertDialog.Builder(this)
                         .setView(panel)
                         .setNegativeButton(
@@ -895,16 +1115,12 @@ public class MainActivity extends Activity {
                         )
                         .create();
 
-        enter.setOnClickListener(
+        bookDialog[0] = dialog;
+
+        read.setOnClickListener(
                 v -> {
 
-                    if (
-                            bookDialog[0] != null
-                    ) {
-
-                        bookDialog[0]
-                                .dismiss();
-                    }
+                    dialog.dismiss();
 
                     reader(book);
                 }
@@ -913,63 +1129,44 @@ public class MainActivity extends Activity {
         manage.setOnClickListener(
                 v -> {
 
-                    if (
-                            bookDialog[0] != null
-                    ) {
-
-                        bookDialog[0]
-                                .dismiss();
-                    }
+                    dialog.dismiss();
 
                     manageBook(book);
                 }
         );
 
-        bookDialog[0].show();
+        dialog.setOnShowListener(
+                d -> {
+
+                    if (dialog.getWindow() != null) {
+
+                        dialog.getWindow()
+                                .setBackgroundDrawableResource(
+                                        android.R.color.transparent
+                                );
+                    }
+                }
+        );
+
+        dialog.show();
     }
 
-    // ============================================================
+    // =========================================================
     // 创建书本
-    // ============================================================
+    // =========================================================
 
     private void createBook() {
 
-        File[] existing =
-                booksDir.listFiles();
-
         int number = 1;
 
-        if (existing != null) {
+        while (
+                new File(
+                        booksDir,
+                        "书本 " + number
+                ).exists()
+        ) {
 
-            Set<Integer> used =
-                    new HashSet<>();
-
-            for (File file : existing) {
-
-                if (
-                        file.isDirectory()
-                                && file.getName()
-                                .startsWith("书本 ")
-                ) {
-
-                    try {
-
-                        used.add(
-                                Integer.parseInt(
-                                        file.getName()
-                                                .substring(3)
-                                                .trim()
-                                )
-                        );
-
-                    } catch (Exception ignored) {
-                    }
-                }
-            }
-
-            while (used.contains(number)) {
-                number++;
-            }
+            number++;
         }
 
         File book =
@@ -978,19 +1175,31 @@ public class MainActivity extends Activity {
                         "书本 " + number
                 );
 
-        book.mkdirs();
+        if (!book.mkdirs()) {
 
-        getCoverDir(book);
+            Toast.makeText(
+                    this,
+                    "创建书本失败",
+                    Toast.LENGTH_SHORT
+            ).show();
+
+            return;
+        }
+
+        getCoverDir(book).mkdirs();
 
         showShelf();
+
         reader(book);
     }
 
-    // ============================================================
+    // =========================================================
     // 管理书本
-    // ============================================================
+    // =========================================================
 
-    private void manageBook(final File book) {
+    private void manageBook(
+            final File book
+    ) {
 
         LinearLayout panel =
                 new LinearLayout(this);
@@ -1000,116 +1209,243 @@ public class MainActivity extends Activity {
         );
 
         panel.setPadding(
-                dp(20),
-                dp(16),
-                dp(20),
-                dp(8)
+                dp(18),
+                dp(18),
+                dp(18),
+                dp(12)
         );
 
         panel.setBackgroundColor(
                 Color.BLACK
         );
 
-        TextView label =
-                tv(
-                        "书名",
-                        14
-                );
-
-        label.setTextColor(
-                Color.LTGRAY
-        );
-
-        panel.addView(label);
-
-        final EditText nameEdit =
+        EditText nameInput =
                 new EditText(this);
 
-        nameEdit.setText(
+        nameInput.setText(
                 getDisplayName(book)
         );
 
-        nameEdit.setTextColor(
+        nameInput.setTextColor(
                 Color.WHITE
         );
 
-        nameEdit.setHint(
-                "输入书名"
-        );
-
-        nameEdit.setHintTextColor(
+        nameInput.setHintTextColor(
                 Color.GRAY
         );
 
-        nameEdit.setBackgroundColor(
-                Color.DKGRAY
-        );
+        nameInput.setSingleLine(true);
 
-        nameEdit.setPadding(
-                dp(12),
-                dp(12),
-                dp(12),
-                dp(12)
-        );
-
-        nameEdit.setInputType(
+        nameInput.setInputType(
                 InputType.TYPE_CLASS_TEXT
         );
 
         panel.addView(
-                nameEdit,
+                nameInput,
                 new LinearLayout.LayoutParams(
                         -1,
-                        -2
+                        dp(55)
                 )
         );
 
-        View spacer1 =
-                new View(this);
+        TextView rename =
+                new TextView(this);
 
-        panel.addView(
-                spacer1,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(16)
-                )
+        rename.setText(
+                "保存书名"
         );
 
-        TextView coverBtn =
-                tv(
-                        "更换封面",
-                        16
-                );
-
-        coverBtn.setGravity(
+        rename.setTextSize(16);
+        rename.setTextColor(Color.WHITE);
+        rename.setGravity(
                 Gravity.CENTER
         );
 
-        coverBtn.setBackgroundColor(
+        GradientDrawable renameBg =
+                new GradientDrawable();
+
+        renameBg.setColor(
                 Color.rgb(
-                        60,
-                        60,
-                        60
+                        50,
+                        50,
+                        50
                 )
+        );
+
+        renameBg.setCornerRadius(
+                dp(8)
+        );
+
+        rename.setBackground(
+                renameBg
         );
 
         panel.addView(
-                coverBtn,
+                rename,
                 new LinearLayout.LayoutParams(
                         -1,
-                        dp(48)
+                        dp(50)
                 )
         );
 
-        coverBtn.setOnClickListener(
+        TextView changeCover =
+                new TextView(this);
+
+        changeCover.setText(
+                "更换封面"
+        );
+
+        changeCover.setTextSize(16);
+        changeCover.setTextColor(
+                Color.rgb(
+                        220,
+                        220,
+                        220
+                )
+        );
+
+        changeCover.setGravity(
+                Gravity.CENTER
+        );
+
+        GradientDrawable coverBg =
+                new GradientDrawable();
+
+        coverBg.setColor(
+                Color.rgb(
+                        35,
+                        35,
+                        35
+                )
+        );
+
+        coverBg.setCornerRadius(
+                dp(8)
+        );
+
+        changeCover.setBackground(
+                coverBg
+        );
+
+        LinearLayout.LayoutParams coverParams =
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(50)
+                );
+
+        coverParams.setMargins(
+                0,
+                dp(8),
+                0,
+                0
+        );
+
+        panel.addView(
+                changeCover,
+                coverParams
+        );
+
+        TextView delete =
+                new TextView(this);
+
+        delete.setText(
+                "删除书本"
+        );
+
+        delete.setTextSize(16);
+        delete.setTextColor(
+                Color.rgb(
+                        210,
+                        210,
+                        210
+                )
+        );
+
+        delete.setGravity(
+                Gravity.CENTER
+        );
+
+        GradientDrawable deleteBg =
+                new GradientDrawable();
+
+        deleteBg.setColor(
+                Color.rgb(
+                        55,
+                        35,
+                        35
+                )
+        );
+
+        deleteBg.setCornerRadius(
+                dp(8)
+        );
+
+        delete.setBackground(
+                deleteBg
+        );
+
+        LinearLayout.LayoutParams deleteParams =
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(50)
+                );
+
+        deleteParams.setMargins(
+                0,
+                dp(8),
+                0,
+                0
+        );
+
+        panel.addView(
+                delete,
+                deleteParams
+        );
+
+        AlertDialog dialog =
+                new AlertDialog.Builder(this)
+                        .setView(panel)
+                        .setNegativeButton(
+                                "取消",
+                                null
+                        )
+                        .create();
+
+        rename.setOnClickListener(
+                v -> {
+
+                    String newName =
+                            nameInput.getText()
+                                    .toString()
+                                    .trim();
+
+                    if (newName.isEmpty()) {
+
+                        Toast.makeText(
+                                this,
+                                "书名不能为空",
+                                Toast.LENGTH_SHORT
+                        ).show();
+
+                        return;
+                    }
+
+                    setDisplayName(
+                            book,
+                            newName
+                    );
+
+                    dialog.dismiss();
+
+                    showShelf();
+                }
+        );
+
+        changeCover.setOnClickListener(
                 v -> {
 
                     pendingCoverDisplayName =
-                            nameEdit
-                                    .getText()
-                                    .toString();
-
-                    currentBook = book;
+                            book.getName();
 
                     Intent intent =
                             new Intent(
@@ -1128,140 +1464,42 @@ public class MainActivity extends Activity {
                             intent,
                             REQ_PICK_COVER
                     );
+
+                    dialog.dismiss();
                 }
         );
 
-        View spacer2 =
-                new View(this);
-
-        panel.addView(
-                spacer2,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(12)
-                )
-        );
-
-        TextView deleteBtn =
-                tv(
-                        "删除书本",
-                        16
-                );
-
-        deleteBtn.setGravity(
-                Gravity.CENTER
-        );
-
-        deleteBtn.setBackgroundColor(
-                Color.rgb(
-                        120,
-                        40,
-                        40
-                )
-        );
-
-        panel.addView(
-                deleteBtn,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(48)
-                )
-        );
-
-        final AlertDialog[] manageDialog =
-                new AlertDialog[1];
-
-        deleteBtn.setOnClickListener(
+        delete.setOnClickListener(
                 v -> {
 
                     new AlertDialog.Builder(this)
-                            .setTitle(
-                                    "确认删除"
-                            )
+                            .setTitle("删除书本")
                             .setMessage(
-                                    "确定删除《" +
-                                            getDisplayName(book) +
-                                            "》吗？\n此操作不可恢复。"
-                            )
-                            .setPositiveButton(
-                                    "删除",
-                                    (d, w) -> {
-
-                                        boolean success =
-                                                deleteBook(book);
-
-                                        if (
-                                                manageDialog[0] != null
-                                        ) {
-                                            manageDialog[0]
-                                                    .dismiss();
-                                        }
-
-                                        if (success) {
-
-                                            showShelf();
-
-                                            Toast.makeText(
-                                                    this,
-                                                    "书本已删除",
-                                                    Toast.LENGTH_SHORT
-                                            ).show();
-
-                                        } else {
-
-                                            Toast.makeText(
-                                                    this,
-                                                    "删除失败",
-                                                    Toast.LENGTH_SHORT
-                                            ).show();
-                                        }
-                                    }
+                                    "确定删除这本书以及其中的全部图片吗？"
                             )
                             .setNegativeButton(
                                     "取消",
                                     null
                             )
+                            .setPositiveButton(
+                                    "删除",
+                                    (d, which) -> {
+
+                                        deleteBook(book);
+
+                                        showShelf();
+                                    }
+                            )
                             .show();
                 }
         );
 
-        manageDialog[0] =
-                new AlertDialog.Builder(this)
-                        .setTitle(
-                                "管理书本"
-                        )
-                        .setView(panel)
-                        .setPositiveButton(
-                                "保存",
-                                (d, w) -> {
-
-                                    setDisplayName(
-                                            book,
-                                            nameEdit
-                                                    .getText()
-                                                    .toString()
-                                    );
-
-                                    pendingCoverDisplayName =
-                                            null;
-
-                                    showShelf();
-                                }
-                        )
-                        .setNegativeButton(
-                                "取消",
-                                (d, w) -> {
-
-                                    pendingCoverDisplayName =
-                                            null;
-                                }
-                        )
-                        .create();
-
-        manageDialog[0].show();
+        dialog.show();
     }
 
-    private boolean deleteBook(File book) {
+    private boolean deleteBook(
+            File book
+    ) {
 
         boolean success =
                 deleteRecursive(book);
@@ -1281,14 +1519,69 @@ public class MainActivity extends Activity {
                 )
                 .apply();
 
+        removeFromShelfOrder(id);
+
         return success;
     }
 
-    private boolean deleteRecursive(File file) {
+    private void removeFromShelfOrder(
+            String bookName
+    ) {
 
-        if (!file.exists()) {
-            return true;
+        String saved =
+                sp.getString(
+                        "shelf_order",
+                        ""
+                );
+
+        if (saved.isEmpty()) {
+            return;
         }
+
+        StringBuilder result =
+                new StringBuilder();
+
+        String[] names =
+                saved.split("\\|");
+
+        for (String name : names) {
+
+            if (
+                    name.isEmpty()
+                            || name.equals(bookName)
+            ) {
+                continue;
+            }
+
+            if (result.length() > 0) {
+                result.append("|");
+            }
+
+            result.append(name);
+        }
+
+        if (result.length() == 0) {
+
+            sp.edit()
+                    .remove(
+                            "shelf_order"
+                    )
+                    .apply();
+
+        } else {
+
+            sp.edit()
+                    .putString(
+                            "shelf_order",
+                            result.toString()
+                    )
+                    .apply();
+        }
+    }
+
+    private boolean deleteRecursive(
+            File file
+    ) {
 
         if (file.isDirectory()) {
 
@@ -1299,9 +1592,7 @@ public class MainActivity extends Activity {
 
                 for (File child : children) {
 
-                    if (!deleteRecursive(child)) {
-                        return false;
-                    }
+                    deleteRecursive(child);
                 }
             }
         }
@@ -1309,65 +1600,64 @@ public class MainActivity extends Activity {
         return file.delete();
     }
 
-    // ============================================================
+    // =========================================================
     // 图片列表
-    // ============================================================
+    // =========================================================
 
-    private ArrayList<File> images(File book) {
-
-        File[] files =
-                book.listFiles();
+    private ArrayList<File> images(
+            File book
+    ) {
 
         ArrayList<File> result =
                 new ArrayList<>();
 
-        if (files != null) {
+        File[] files =
+                book.listFiles();
 
-            for (File file : files) {
+        if (files == null) {
+            return result;
+        }
 
-                if (
-                        file.isFile()
-                                && file.getName()
-                                .matches(
-                                        "(?i).*\\.(jpg|jpeg|png|webp|gif)$"
-                                )
-                ) {
-                    result.add(file);
-                }
+        for (File file : files) {
+
+            if (!file.isFile()) {
+                continue;
+            }
+
+            String name =
+                    file.getName()
+                            .toLowerCase();
+
+            if (
+                    name.endsWith(".jpg")
+                            || name.endsWith(".jpeg")
+                            || name.endsWith(".png")
+                            || name.endsWith(".webp")
+                            || name.endsWith(".gif")
+            ) {
+
+                result.add(file);
             }
         }
 
-        ArrayList<File> natural =
-                new ArrayList<>(
-                        result
-                );
-
         Collections.sort(
-                natural,
-                new Comparator<File>() {
-                    @Override
-                    public int compare(
-                            File a,
-                            File b
-                    ) {
-
-                        return naturalCompare(
+                result,
+                (a, b) ->
+                        naturalCompare(
                                 a.getName(),
                                 b.getName()
-                        );
-                    }
-                }
+                        )
         );
 
         String saved =
                 sp.getString(
-                        "order_" +
-                                book.getName(),
+                        "order_" + book.getName(),
                         ""
                 );
 
         if (saved.isEmpty()) {
-            return natural;
+
+            return result;
         }
 
         ArrayList<File> ordered =
@@ -1381,7 +1671,7 @@ public class MainActivity extends Activity {
 
         for (String name : names) {
 
-            for (File file : natural) {
+            for (File file : result) {
 
                 if (
                         file.getName()
@@ -1396,13 +1686,12 @@ public class MainActivity extends Activity {
             }
         }
 
-        for (File file : natural) {
+        for (File file : result) {
 
-            if (
-                    !used.contains(
-                            file.getName()
-                    )
-            ) {
+            if (!used.contains(
+                    file.getName()
+            )) {
+
                 ordered.add(file);
             }
         }
@@ -1415,98 +1704,135 @@ public class MainActivity extends Activity {
             String b
     ) {
 
-        String[] x =
-                a.split(
-                        "(?<=\\D)(?=\\d)|(?<=\\d)(?=\\D)"
-                );
+        int ia = 0;
+        int ib = 0;
 
-        String[] y =
-                b.split(
-                        "(?<=\\D)(?=\\d)|(?<=\\d)(?=\\D)"
-                );
-
-        for (
-                int i = 0;
-                i < Math.min(
-                        x.length,
-                        y.length
-                );
-                i++
+        while (
+                ia < a.length()
+                        && ib < b.length()
         ) {
 
-            try {
+            char ca = a.charAt(ia);
+            char cb = b.charAt(ib);
 
-                int p =
-                        Integer.parseInt(
-                                x[i]
+            if (
+                    Character.isDigit(ca)
+                            && Character.isDigit(cb)
+            ) {
+
+                int sa = ia;
+                int sb = ib;
+
+                while (
+                        ia < a.length()
+                                && Character.isDigit(
+                                a.charAt(ia)
+                        )
+                ) {
+                    ia++;
+                }
+
+                while (
+                        ib < b.length()
+                                && Character.isDigit(
+                                b.charAt(ib)
+                        )
+                ) {
+                    ib++;
+                }
+
+                try {
+
+                    long na =
+                            Long.parseLong(
+                                    a.substring(
+                                            sa,
+                                            ia
+                                    )
+                            );
+
+                    long nb =
+                            Long.parseLong(
+                                    b.substring(
+                                            sb,
+                                            ib
+                                    )
+                            );
+
+                    if (na != nb) {
+
+                        return Long.compare(
+                                na,
+                                nb
                         );
+                    }
 
-                int q =
-                        Integer.parseInt(
-                                y[i]
-                        );
+                } catch (Exception e) {
 
-                if (p != q) {
+                    int compare =
+                            a.substring(
+                                    sa,
+                                    ia
+                            ).compareTo(
+                                    b.substring(
+                                            sb,
+                                            ib
+                                    )
+                            );
 
-                    return Integer.compare(
-                            p,
-                            q
+                    if (compare != 0) {
+                        return compare;
+                    }
+                }
+
+            } else {
+
+                char la =
+                        Character.toLowerCase(ca);
+
+                char lb =
+                        Character.toLowerCase(cb);
+
+                if (la != lb) {
+
+                    return Character.compare(
+                            la,
+                            lb
                     );
                 }
 
-            } catch (Exception e) {
-
-                int c =
-                        x[i].compareToIgnoreCase(
-                                y[i]
-                        );
-
-                if (c != 0) {
-                    return c;
-                }
+                ia++;
+                ib++;
             }
         }
 
         return Integer.compare(
-                x.length,
-                y.length
+                a.length(),
+                b.length()
         );
     }
 
-    // ============================================================
+    // =========================================================
     // 阅读器
-    // ============================================================
+    // =========================================================
 
-    private void reader(File book) {
+    private void reader(
+            final File book
+    ) {
 
         currentBook = book;
 
         base();
 
-        ScrollView scrollView =
-                new ScrollView(this);
+        FrameLayout readerContainer =
+                new FrameLayout(this);
 
-        scrollView.setBackgroundColor(
+        readerContainer.setBackgroundColor(
                 Color.BLACK
-        );
-
-        LinearLayout imagesBox =
-                new LinearLayout(this);
-
-        imagesBox.setOrientation(
-                LinearLayout.VERTICAL
-        );
-
-        imagesBox.setBackgroundColor(
-                Color.BLACK
-        );
-
-        scrollView.addView(
-                imagesBox
         );
 
         root.addView(
-                scrollView,
+                readerContainer,
                 new LinearLayout.LayoutParams(
                         -1,
                         0,
@@ -1514,7 +1840,64 @@ public class MainActivity extends Activity {
                 )
         );
 
-        LinearLayout controls =
+        ScrollView scroll =
+                new ScrollView(this);
+
+        scroll.setBackgroundColor(
+                Color.BLACK
+        );
+
+        LinearLayout imageList =
+                new LinearLayout(this);
+
+        imageList.setOrientation(
+                LinearLayout.VERTICAL
+        );
+
+        imageList.setBackgroundColor(
+                Color.BLACK
+        );
+
+        ArrayList<File> files =
+                images(book);
+
+        for (File file : files) {
+
+            ImageView image =
+                    new ImageView(this);
+
+            image.setAdjustViewBounds(
+                    true
+            );
+
+            image.setScaleType(
+                    ImageView.ScaleType.CENTER_CROP
+            );
+
+            image.setImageURI(
+                    Uri.fromFile(file)
+            );
+
+            imageList.addView(
+                    image,
+                    new LinearLayout.LayoutParams(
+                            -1,
+                            -2
+                    )
+            );
+        }
+
+        scroll.addView(imageList);
+
+        readerContainer.addView(
+                scroll,
+                new FrameLayout.LayoutParams(
+                        -1,
+                        -1
+                )
+        );
+
+        final LinearLayout controls =
                 new LinearLayout(this);
 
         controls.setOrientation(
@@ -1525,133 +1908,77 @@ public class MainActivity extends Activity {
                 Gravity.CENTER
         );
 
-        controls.setBackgroundColor(
-                Color.DKGRAY
+        controls.setPadding(
+                dp(8),
+                dp(8),
+                dp(8),
+                dp(8)
+        );
+
+        GradientDrawable controlsBg =
+                new GradientDrawable();
+
+        controlsBg.setColor(
+                Color.argb(
+                        225,
+                        25,
+                        25,
+                        25
+                )
+        );
+
+        controlsBg.setCornerRadius(
+                dp(12)
+        );
+
+        controls.setBackground(
+                controlsBg
+        );
+
+        TextView sort =
+                readerButton("图片排序");
+
+        TextView add =
+                readerButton("添加图片");
+
+        TextView manage =
+                readerButton("管理图片");
+
+        TextView top =
+                readerButton("回顶部");
+
+        controls.addView(sort);
+        controls.addView(add);
+        controls.addView(manage);
+        controls.addView(top);
+
+        FrameLayout.LayoutParams controlParams =
+                new FrameLayout.LayoutParams(
+                        -1,
+                        -2,
+                        Gravity.BOTTOM
+                );
+
+        controlParams.setMargins(
+                dp(8),
+                dp(8),
+                dp(8),
+                dp(12)
+        );
+
+        readerContainer.addView(
+                controls,
+                controlParams
         );
 
         controls.setVisibility(
                 View.GONE
         );
 
-        TextView sortButton =
-                tv(
-                        "图片排序",
-                        13
-                );
-
-        TextView addButton =
-                tv(
-                        "添加图片",
-                        13
-                );
-
-        TextView manageButton =
-                tv(
-                        "管理图片",
-                        13
-                );
-
-        TextView topButton =
-                tv(
-                        "回顶部",
-                        13
-                );
-
-        sortButton.setGravity(
-                Gravity.CENTER
-        );
-
-        addButton.setGravity(
-                Gravity.CENTER
-        );
-
-        manageButton.setGravity(
-                Gravity.CENTER
-        );
-
-        topButton.setGravity(
-                Gravity.CENTER
-        );
-
-        controls.addView(
-                sortButton,
-                new LinearLayout.LayoutParams(
-                        0,
-                        dp(52),
-                        1
-                )
-        );
-
-        controls.addView(
-                addButton,
-                new LinearLayout.LayoutParams(
-                        0,
-                        dp(52),
-                        1
-                )
-        );
-
-        controls.addView(
-                manageButton,
-                new LinearLayout.LayoutParams(
-                        0,
-                        dp(52),
-                        1
-                )
-        );
-
-        controls.addView(
-                topButton,
-                new LinearLayout.LayoutParams(
-                        0,
-                        dp(52),
-                        1
-                )
-        );
-
-        root.addView(
-                controls,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(52)
-                )
-        );
-
-        ArrayList<File> files =
-                images(book);
-
-        for (File file : files) {
-
-            addImage(
-                    imagesBox,
-                    file
-            );
-        }
-
-        sortButton.setOnClickListener(
-                v -> sortMenu(book)
-        );
-
-        addButton.setOnClickListener(
-                v -> pick(book)
-        );
-
-        manageButton.setOnClickListener(
-                v -> manageImages(book)
-        );
-
-        topButton.setOnClickListener(
-                v ->
-                        scrollView.smoothScrollTo(
-                                0,
-                                0
-                        )
-        );
-
         final long[] lastTap =
                 {0};
 
-        scrollView.setOnTouchListener(
+        scroll.setOnTouchListener(
                 (v, event) -> {
 
                     if (
@@ -1667,12 +1994,21 @@ public class MainActivity extends Activity {
                                         < 350
                         ) {
 
-                            controls.setVisibility(
+                            if (
                                     controls.getVisibility()
                                             == View.VISIBLE
-                                            ? View.GONE
-                                            : View.VISIBLE
-                            );
+                            ) {
+
+                                controls.setVisibility(
+                                        View.GONE
+                                );
+
+                            } else {
+
+                                controls.setVisibility(
+                                        View.VISIBLE
+                                );
+                            }
                         }
 
                         lastTap[0] = now;
@@ -1682,71 +2018,80 @@ public class MainActivity extends Activity {
                 }
         );
 
-        scrollView.post(
-                () -> {
+        int savedY =
+                sp.getInt(
+                        "y_" + book.getName(),
+                        0
+                );
 
-                    int position =
-                            sp.getInt(
-                                    "y_" +
-                                            book.getName(),
-                                    0
-                            );
-
-                    scrollView.scrollTo(
-                            0,
-                            position
-                    );
-                }
+        scroll.post(
+                () -> scroll.scrollTo(
+                        0,
+                        savedY
+                )
         );
 
-        scrollView.setOnScrollChangeListener(
-                (v, x, y, oldX, oldY) -> {
+        scroll.setOnScrollChangeListener(
+                (v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
 
                     sp.edit()
                             .putInt(
-                                    "y_" +
-                                            book.getName(),
-                                    y
+                                    "y_" + book.getName(),
+                                    scrollY
                             )
                             .apply();
                 }
         );
-    }
 
-    private void addImage(
-            LinearLayout box,
-            File file
-    ) {
-
-        ImageView image =
-                new ImageView(this);
-
-        image.setAdjustViewBounds(true);
-
-        image.setScaleType(
-                ImageView.ScaleType.CENTER_CROP
+        sort.setOnClickListener(
+                v -> sortImages(book)
         );
 
-        image.setImageURI(
-                Uri.fromFile(file)
+        add.setOnClickListener(
+                v -> pickImages()
         );
 
-        box.addView(
-                image,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        -2
+        manage.setOnClickListener(
+                v -> manageImages(book)
+        );
+
+        top.setOnClickListener(
+                v -> scroll.smoothScrollTo(
+                        0,
+                        0
                 )
         );
     }
 
-    // ============================================================
+    private TextView readerButton(
+            String text
+    ) {
+
+        TextView button =
+                new TextView(this);
+
+        button.setText(text);
+        button.setTextSize(13);
+        button.setTextColor(Color.WHITE);
+        button.setGravity(
+                Gravity.CENTER
+        );
+
+        button.setPadding(
+                dp(6),
+                dp(10),
+                dp(6),
+                dp(10)
+        );
+
+        return button;
+    }
+
+    // =========================================================
     // 添加图片
-    // ============================================================
+    // =========================================================
 
-    private void pick(File book) {
-
-        currentBook = book;
+    private void pickImages() {
 
         Intent intent =
                 new Intent(
@@ -1786,460 +2131,329 @@ public class MainActivity extends Activity {
         );
 
         if (
-                resultCode != RESULT_OK ||
-                        data == null ||
-                        currentBook == null
+                resultCode != RESULT_OK
+                        || data == null
         ) {
+            return;
+        }
+
+        if (
+                requestCode == REQ_ADD_IMAGES
+        ) {
+
+            if (currentBook == null) {
+                return;
+            }
+
+            if (
+                    data.getClipData() != null
+            ) {
+
+                int count =
+                        data.getClipData()
+                                .getItemCount();
+
+                for (
+                        int i = 0;
+                        i < count;
+                        i++
+                ) {
+
+                    Uri uri =
+                            data.getClipData()
+                                    .getItemAt(i)
+                                    .getUri();
+
+                    copyImage(
+                            uri,
+                            currentBook
+                    );
+                }
+
+            } else if (
+                    data.getData() != null
+            ) {
+
+                copyImage(
+                        data.getData(),
+                        currentBook
+                );
+            }
+
+            reader(currentBook);
+
+        } else if (
+                requestCode == REQ_PICK_COVER
+        ) {
+
+            if (
+                    pendingCoverDisplayName
+                            == null
+            ) {
+                return;
+            }
+
+            File book =
+                    new File(
+                            booksDir,
+                            pendingCoverDisplayName
+                    );
+
+            copyCover(
+                    data.getData(),
+                    book
+            );
+
+            pendingCoverDisplayName =
+                    null;
+
+            showShelf();
+        }
+    }
+
+    private String getFileName(
+            Uri uri
+    ) {
+
+        Cursor cursor =
+                getContentResolver()
+                        .query(
+                                uri,
+                                null,
+                                null,
+                                null,
+                                null
+                        );
+
+        if (cursor != null) {
+
+            try {
+
+                int index =
+                        cursor.getColumnIndex(
+                                OpenableColumns.DISPLAY_NAME
+                        );
+
+                if (index >= 0
+                        && cursor.moveToFirst()) {
+
+                    String name =
+                            cursor.getString(index);
+
+                    if (
+                            name != null
+                                    && !name.isEmpty()
+                    ) {
+
+                        return name;
+                    }
+                }
+
+            } finally {
+
+                cursor.close();
+            }
+        }
+
+        return "image_" +
+                System.currentTimeMillis() +
+                ".jpg";
+    }
+
+    private void copyImage(
+            Uri uri,
+            File book
+    ) {
+
+        try {
+
+            String originalName =
+                    getFileName(uri);
+
+            String extension =
+                    ".jpg";
+
+            int dot =
+                    originalName.lastIndexOf('.');
+
+            if (dot >= 0) {
+
+                extension =
+                        originalName.substring(dot);
+            }
+
+            String baseName =
+                    originalName;
+
+            if (dot >= 0) {
+
+                baseName =
+                        originalName.substring(
+                                0,
+                                dot
+                        );
+            }
+
+            File target =
+                    new File(
+                            book,
+                            originalName
+                    );
+
+            int count = 1;
+
+            while (target.exists()) {
+
+                target =
+                        new File(
+                                book,
+                                baseName
+                                        + "_"
+                                        + count
+                                        + extension
+                        );
+
+                count++;
+            }
+
+            InputStream in =
+                    getContentResolver()
+                            .openInputStream(uri);
+
+            if (in == null) {
+                return;
+            }
+
+            FileOutputStream out =
+                    new FileOutputStream(
+                            target
+                    );
+
+            byte[] buffer =
+                    new byte[8192];
+
+            int len;
+
+            while (
+                    (len = in.read(buffer))
+                            != -1
+            ) {
+
+                out.write(
+                        buffer,
+                        0,
+                        len
+                );
+            }
+
+            out.flush();
+            out.close();
+            in.close();
+
+        } catch (Exception e) {
+
+            Toast.makeText(
+                    this,
+                    "图片添加失败",
+                    Toast.LENGTH_SHORT
+            ).show();
+        }
+    }
+
+    private void copyCover(
+            Uri uri,
+            File book
+    ) {
+
+        if (uri == null) {
             return;
         }
 
         try {
 
-            if (
-                    requestCode ==
-                            REQ_ADD_IMAGES
-            ) {
+            getCoverDir(book).mkdirs();
 
-                if (
-                        data.getClipData() != null
-                ) {
+            InputStream in =
+                    getContentResolver()
+                            .openInputStream(uri);
 
-                    for (
-                            int i = 0;
-                            i <
-                                    data.getClipData()
-                                            .getItemCount();
-                            i++
-                    ) {
-
-                        copyImage(
-                                data.getClipData()
-                                        .getItemAt(i)
-                                        .getUri(),
-                                currentBook,
-                                false
-                        );
-                    }
-
-                } else if (
-                        data.getData() != null
-                ) {
-
-                    copyImage(
-                            data.getData(),
-                            currentBook,
-                            false
-                    );
-                }
-
-                reader(currentBook);
-
-            } else if (
-                    requestCode ==
-                            REQ_PICK_COVER
-            ) {
-
-                if (
-                        data.getData() != null
-                ) {
-
-                    if (
-                            pendingCoverDisplayName
-                                    != null
-                    ) {
-
-                        setDisplayName(
-                                currentBook,
-                                pendingCoverDisplayName
-                        );
-                    }
-
-                    copyImage(
-                            data.getData(),
-                            currentBook,
-                            true
-                    );
-
-                    pendingCoverDisplayName =
-                            null;
-
-                    showShelf();
-                }
+            if (in == null) {
+                return;
             }
 
-        } catch (Exception e) {
-
-            e.printStackTrace();
-
-            Toast.makeText(
-                    this,
-                    "操作失败: " +
-                            e.getMessage(),
-                    Toast.LENGTH_SHORT
-            ).show();
-
-        } finally {
-
-            if (
-                    requestCode ==
-                            REQ_PICK_COVER
-            ) {
-                pendingCoverDisplayName =
-                        null;
-            }
-        }
-    }
-
-    private void copyImage(
-            Uri uri,
-            File book,
-            boolean isCover
-    ) throws Exception {
-
-        String name;
-
-        if (isCover) {
-
-            name =
-                    "cover.jpg";
-
-        } else {
-
-            name =
-                    "image_" +
-                            System.currentTimeMillis() +
-                            ".jpg";
-        }
-
-        Cursor cursor =
-                getContentResolver().query(
-                        uri,
-                        null,
-                        null,
-                        null,
-                        null
-                );
-
-        if (cursor != null) {
-
-            int index =
-                    cursor.getColumnIndex(
-                            OpenableColumns.DISPLAY_NAME
+            FileOutputStream out =
+                    new FileOutputStream(
+                            getCoverFile(book)
                     );
-
-            if (
-                    cursor.moveToFirst()
-                            && index >= 0
-            ) {
-
-                String original =
-                        cursor.getString(
-                                index
-                        );
-
-                if (
-                        original != null
-                                && !original.isEmpty()
-                                && !isCover
-                ) {
-
-                    name = original;
-                }
-            }
-
-            cursor.close();
-        }
-
-        File output;
-
-        if (isCover) {
-
-            output =
-                    getCoverFile(book);
-
-        } else {
-
-            output =
-                    new File(
-                            book,
-                            name
-                    );
-        }
-
-        InputStream input =
-                getContentResolver()
-                        .openInputStream(uri);
-
-        if (input == null) {
-
-            throw new Exception(
-                    "无法打开图片"
-            );
-        }
-
-        try (
-                InputStream in = input;
-                FileOutputStream outputStream =
-                        new FileOutputStream(
-                                output
-                        )
-        ) {
 
             byte[] buffer =
                     new byte[8192];
 
-            int length;
+            int len;
 
             while (
-                    (length =
-                            in.read(buffer)) > 0
+                    (len = in.read(buffer))
+                            != -1
             ) {
 
-                outputStream.write(
+                out.write(
                         buffer,
                         0,
-                        length
+                        len
                 );
             }
+
+            out.flush();
+            out.close();
+            in.close();
+
+        } catch (Exception e) {
+
+            Toast.makeText(
+                    this,
+                    "封面更换失败",
+                    Toast.LENGTH_SHORT
+            ).show();
         }
     }
 
-    // ============================================================
+    // =========================================================
     // 图片排序
-    // ============================================================
+    // =========================================================
 
-    private void sortMenu(File book) {
+    private void sortImages(
+            File book
+    ) {
 
-        new AlertDialog.Builder(this)
-                .setTitle(
-                        "图片排序"
-                )
-                .setItems(
-                        new String[]{
-                                "自动数字排序",
-                                "手动排序"
-                        },
-                        (dialog, which) -> {
-
-                            if (which == 0) {
-
-                                sp.edit()
-                                        .remove(
-                                                "order_" +
-                                                        book.getName()
-                                        )
-                                        .apply();
-
-                                reader(book);
-
-                            } else {
-
-                                manualSort(book);
-                            }
-                        }
-                )
-                .show();
-    }
-
-    private void manualSort(File book) {
-
-        ArrayList<File> files =
+        ArrayList<File> list =
                 images(book);
 
-        LinearLayout list =
-                new LinearLayout(this);
-
-        list.setOrientation(
-                LinearLayout.VERTICAL
+        Collections.sort(
+                list,
+                (a, b) ->
+                        naturalCompare(
+                                a.getName(),
+                                b.getName()
+                        )
         );
 
-        list.setBackgroundColor(
-                Color.BLACK
+        saveImageOrder(
+                book,
+                list
         );
 
-        for (File file : files) {
-
-            addSortItem(
-                    list,
-                    files,
-                    file,
-                    book
-            );
-        }
-
-        ScrollView scroll =
-                new ScrollView(this);
-
-        scroll.setBackgroundColor(
-                Color.BLACK
-        );
-
-        scroll.addView(list);
-
-        new AlertDialog.Builder(this)
-                .setTitle(
-                        "手动排序"
-                )
-                .setMessage(
-                        "长按图片名称，然后拖动调整顺序"
-                )
-                .setView(scroll)
-                .setPositiveButton(
-                        "完成",
-                        (dialog, which) -> {
-
-                            saveOrder(
-                                    book,
-                                    files
-                            );
-
-                            reader(book);
-                        }
-                )
-                .setNegativeButton(
-                        "取消",
-                        null
-                )
-                .show();
+        reader(book);
     }
 
-    private void addSortItem(
-            LinearLayout list,
-            ArrayList<File> files,
-            File file,
-            File book
-    ) {
-
-        TextView item =
-                tv(
-                        file.getName(),
-                        15
-                );
-
-        item.setBackgroundColor(
-                Color.DKGRAY
-        );
-
-        item.setGravity(
-                Gravity.CENTER_VERTICAL
-        );
-
-        LinearLayout.LayoutParams params =
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(52)
-                );
-
-        params.setMargins(
-                dp(4),
-                dp(2),
-                dp(4),
-                dp(2)
-        );
-
-        list.addView(
-                item,
-                params
-        );
-
-        item.setOnLongClickListener(
-                v -> {
-
-                    View.DragShadowBuilder shadow =
-                            new View.DragShadowBuilder(
-                                    item
-                            );
-
-                    item.startDragAndDrop(
-                            null,
-                            shadow,
-                            file,
-                            0
-                    );
-
-                    return true;
-                }
-        );
-
-        item.setOnDragListener(
-                (v, event) -> {
-
-                    if (
-                            event.getAction()
-                                    ==
-                                    android.view.DragEvent
-                                            .ACTION_DROP
-                    ) {
-
-                        File dragged =
-                                (File)
-                                        event.getLocalState();
-
-                        int from =
-                                files.indexOf(
-                                        dragged
-                                );
-
-                        int to =
-                                files.indexOf(
-                                        file
-                                );
-
-                        if (
-                                from >= 0
-                                        && to >= 0
-                                        && from != to
-                        ) {
-
-                            Collections.swap(
-                                    files,
-                                    from,
-                                    to
-                            );
-
-                            rebuildSortList(
-                                    list,
-                                    files,
-                                    book
-                            );
-                        }
-
-                        return true;
-                    }
-
-                    return true;
-                }
-        );
-    }
-
-    private void rebuildSortList(
-            LinearLayout list,
-            ArrayList<File> files,
-            File book
-    ) {
-
-        list.removeAllViews();
-
-        for (File file : files) {
-
-            addSortItem(
-                    list,
-                    files,
-                    file,
-                    book
-            );
-        }
-    }
-
-    private void saveOrder(
+    private void saveImageOrder(
             File book,
-            ArrayList<File> files
+            ArrayList<File> list
     ) {
 
         StringBuilder order =
                 new StringBuilder();
 
-        for (File file : files) {
+        for (File file : list) {
 
             if (order.length() > 0) {
                 order.append("|");
@@ -2252,47 +2466,118 @@ public class MainActivity extends Activity {
 
         sp.edit()
                 .putString(
-                        "order_" +
-                                book.getName(),
+                        "order_" + book.getName(),
                         order.toString()
                 )
                 .apply();
     }
 
-    // ============================================================
+    // =========================================================
+    // 手动图片排序
+    // =========================================================
+
+    private void manualSortImages(
+            File book
+    ) {
+
+        ArrayList<File> list =
+                images(book);
+
+        if (list.size() < 2) {
+
+            Toast.makeText(
+                    this,
+                    "图片数量不足",
+                    Toast.LENGTH_SHORT
+            ).show();
+
+            return;
+        }
+
+        String[] names =
+                new String[list.size()];
+
+        for (
+                int i = 0;
+                i < list.size();
+                i++
+        ) {
+
+            names[i] =
+                    list.get(i).getName();
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("图片排序")
+                .setItems(
+                        names,
+                        null
+                )
+                .setNegativeButton(
+                        "取消",
+                        null
+                )
+                .show();
+    }
+
+    // =========================================================
     // 管理图片
-    // ============================================================
+    // =========================================================
 
     private void manageImages(
             final File book
     ) {
 
-        final LinearLayout list =
+        final ArrayList<File> list =
+                images(book);
+
+        LinearLayout panel =
                 new LinearLayout(this);
 
-        list.setOrientation(
+        panel.setOrientation(
                 LinearLayout.VERTICAL
         );
 
-        list.setBackgroundColor(
-                Color.BLACK
+        panel.setPadding(
+                dp(10),
+                dp(10),
+                dp(10),
+                dp(10)
         );
 
-        list.setPadding(
-                dp(8),
-                dp(8),
-                dp(8),
-                dp(8)
+        panel.setBackgroundColor(
+                Color.BLACK
         );
 
         ScrollView scroll =
                 new ScrollView(this);
 
-        scroll.setBackgroundColor(
-                Color.BLACK
+        LinearLayout imageList =
+                new LinearLayout(this);
+
+        imageList.setOrientation(
+                LinearLayout.VERTICAL
         );
 
-        scroll.addView(list);
+        scroll.addView(imageList);
+
+        panel.addView(
+                scroll,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(430)
+                )
+        );
+
+        AlertDialog dialog =
+                new AlertDialog.Builder(this)
+                        .setTitle("管理图片")
+                        .setView(panel)
+                        .setNegativeButton(
+                                "关闭",
+                                null
+                        )
+                        .create();
 
         final Runnable[] refreshList =
                 new Runnable[1];
@@ -2303,37 +2588,13 @@ public class MainActivity extends Activity {
                     @Override
                     public void run() {
 
-                        list.removeAllViews();
+                        imageList.removeAllViews();
 
-                        ArrayList<File> files =
+                        ArrayList<File> current =
                                 images(book);
 
-                        if (files.isEmpty()) {
-
-                            TextView empty =
-                                    tv(
-                                            "当前没有图片",
-                                            16
-                                    );
-
-                            empty.setGravity(
-                                    Gravity.CENTER
-                            );
-
-                            list.addView(
-                                    empty,
-                                    new LinearLayout.LayoutParams(
-                                            -1,
-                                            dp(100)
-                                    )
-                            );
-
-                            return;
-                        }
-
                         for (
-                                final File file :
-                                files
+                                File file : current
                         ) {
 
                             LinearLayout row =
@@ -2349,148 +2610,126 @@ public class MainActivity extends Activity {
                                     Gravity.CENTER_VERTICAL
                             );
 
-                            row.setBackgroundColor(
-                                    Color.rgb(
-                                            40,
-                                            40,
-                                            40
+                            row.setPadding(
+                                    dp(4),
+                                    dp(5),
+                                    dp(4),
+                                    dp(5)
+                            );
+
+                            ImageView image =
+                                    new ImageView(
+                                            MainActivity.this
+                                    );
+
+                            image.setScaleType(
+                                    ImageView.ScaleType.CENTER_CROP
+                            );
+
+                            image.setImageURI(
+                                    Uri.fromFile(file)
+                            );
+
+                            row.addView(
+                                    image,
+                                    new LinearLayout.LayoutParams(
+                                            dp(70),
+                                            dp(90)
                                     )
                             );
 
-                            row.setPadding(
-                                    dp(8),
-                                    dp(6),
-                                    dp(8),
-                                    dp(6)
+                            TextView fileName =
+                                    new TextView(
+                                            MainActivity.this
+                                    );
+
+                            fileName.setText(
+                                    file.getName()
                             );
 
-                            LinearLayout.LayoutParams rowParams =
+                            fileName.setTextSize(13);
+                            fileName.setTextColor(
+                                    Color.WHITE
+                            );
+
+                            fileName.setGravity(
+                                    Gravity.CENTER_VERTICAL
+                            );
+
+                            LinearLayout.LayoutParams
+                                    nameParams =
                                     new LinearLayout.LayoutParams(
+                                            0,
                                             -1,
-                                            -2
+                                            1
                                     );
 
-                            rowParams.setMargins(
+                            nameParams.setMargins(
+                                    dp(10),
                                     0,
-                                    dp(3),
-                                    0,
-                                    dp(3)
-                            );
-
-                            list.addView(
-                                    row,
-                                    rowParams
-                            );
-
-                            TextView name =
-                                    tv(
-                                            file.getName(),
-                                            14
-                                    );
-
-                            name.setPadding(
-                                    0,
-                                    0,
-                                    0,
+                                    dp(8),
                                     0
                             );
 
                             row.addView(
-                                    name,
-                                    new LinearLayout.LayoutParams(
-                                            0,
-                                            -2,
-                                            1
-                                    )
+                                    fileName,
+                                    nameParams
                             );
 
-                            TextView del =
-                                    tv(
-                                            "删除",
-                                            14
+                            TextView delete =
+                                    new TextView(
+                                            MainActivity.this
                                     );
 
-                            del.setGravity(
+                            delete.setText(
+                                    "删除"
+                            );
+
+                            delete.setTextSize(14);
+                            delete.setTextColor(
+                                    Color.WHITE
+                            );
+
+                            delete.setGravity(
                                     Gravity.CENTER
                             );
 
-                            del.setBackgroundColor(
-                                    Color.rgb(
-                                            140,
-                                            40,
-                                            40
-                                    )
-                            );
-
-                            del.setPadding(
-                                    dp(12),
-                                    dp(8),
-                                    dp(12),
-                                    dp(8)
-                            );
-
                             row.addView(
-                                    del,
+                                    delete,
                                     new LinearLayout.LayoutParams(
-                                            -2,
-                                            -2
+                                            dp(60),
+                                            dp(45)
                                     )
                             );
 
-                            del.setOnClickListener(
+                            delete.setOnClickListener(
                                     v -> {
 
-                                        new AlertDialog.Builder(
-                                                MainActivity.this
-                                        )
-                                                .setTitle(
-                                                        "确认删除"
-                                                )
-                                                .setMessage(
-                                                        "确定删除这张图片吗？\n"
-                                                                + file.getName()
-                                                )
-                                                .setPositiveButton(
-                                                        "删除",
-                                                        (d, w) -> {
+                                        if (
+                                                file.delete()
+                                        ) {
 
-                                                            boolean deleted =
-                                                                    file.delete();
+                                            ArrayList<File>
+                                                    after =
+                                                    images(book);
 
-                                                            if (
-                                                                    deleted
-                                                                            || !file.exists()
-                                                            ) {
+                                            saveImageOrder(
+                                                    book,
+                                                    after
+                                            );
 
-                                                                cleanOrderAfterDelete(
-                                                                        book,
-                                                                        file.getName()
-                                                                );
-
-                                                                Toast.makeText(
-                                                                        MainActivity.this,
-                                                                        "图片已删除",
-                                                                        Toast.LENGTH_SHORT
-                                                                ).show();
-
-                                                                refreshList[0].run();
-
-                                                            } else {
-
-                                                                Toast.makeText(
-                                                                        MainActivity.this,
-                                                                        "删除失败",
-                                                                        Toast.LENGTH_SHORT
-                                                                ).show();
-                                                            }
-                                                        }
-                                                )
-                                                .setNegativeButton(
-                                                        "取消",
-                                                        null
-                                                )
-                                                .show();
+                                            refreshList[0]
+                                                    .run();
+                                        }
                                     }
+                            );
+
+                            imageList.addView(
+                                    row,
+                                    new LinearLayout.LayoutParams(
+                                            -1,
+                                            dp(100)
+                                    )
                             );
                         }
                     }
@@ -2498,88 +2737,12 @@ public class MainActivity extends Activity {
 
         refreshList[0].run();
 
-        new AlertDialog.Builder(this)
-                .setTitle(
-                        "管理图片"
-                )
-                .setView(scroll)
-                .setPositiveButton(
-                        "完成",
-                        (d, w) ->
-                                reader(book)
-                )
-                .setNegativeButton(
-                        "关闭",
-                        (d, w) ->
-                                reader(book)
-                )
-                .show();
+        dialog.show();
     }
 
-    private void cleanOrderAfterDelete(
-            File book,
-            String deletedName
-    ) {
-
-        String key =
-                "order_" +
-                        book.getName();
-
-        String saved =
-                sp.getString(
-                        key,
-                        ""
-                );
-
-        if (saved.isEmpty()) {
-            return;
-        }
-
-        StringBuilder newOrder =
-                new StringBuilder();
-
-        String[] names =
-                saved.split("\\|");
-
-        for (String name : names) {
-
-            if (
-                    !name.equals(deletedName)
-                            && !name.isEmpty()
-            ) {
-
-                if (
-                        newOrder.length() > 0
-                ) {
-                    newOrder.append("|");
-                }
-
-                newOrder.append(name);
-            }
-        }
-
-        if (
-                newOrder.length() == 0
-        ) {
-
-            sp.edit()
-                    .remove(key)
-                    .apply();
-
-        } else {
-
-            sp.edit()
-                    .putString(
-                            key,
-                            newOrder.toString()
-                    )
-                    .apply();
-        }
-    }
-
-    // ============================================================
-    // 返回
-    // ============================================================
+    // =========================================================
+    // 返回键
+    // =========================================================
 
     @Override
     public void onBackPressed() {
@@ -2590,17 +2753,9 @@ public class MainActivity extends Activity {
 
             showShelf();
 
-        } else {
-
-            super.onBackPressed();
+            return;
         }
-    }
 
-    @Override
-    protected void onResume() {
-
-        super.onResume();
-
-        fullscreen();
+        super.onBackPressed();
     }
 }
