@@ -43,10 +43,6 @@ public class MainActivity extends Activity {
     private static final int REQ_ADD_IMAGES = 7;
     private static final int REQ_PICK_COVER = 8;
 
-    /*
-     * 更换封面时暂存用户正在编辑的书名。
-     * 这样选择封面回来以后，书名不会丢失。
-     */
     private String pendingCoverDisplayName = null;
 
     @Override
@@ -148,10 +144,6 @@ public class MainActivity extends Activity {
         setContentView(root);
     }
 
-    // ============================================================
-    // 书名
-    // ============================================================
-
     private String getDisplayName(File book) {
 
         String key =
@@ -203,10 +195,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    // ============================================================
-    // 封面
-    // ============================================================
-
     private File getCoverDir(File book) {
 
         File dir =
@@ -239,10 +227,6 @@ public class MainActivity extends Activity {
                 && file.isFile()
                 && file.length() > 0;
     }
-
-    // ============================================================
-    // 书架
-    // ============================================================
 
     private void showShelf() {
 
@@ -399,16 +383,11 @@ public class MainActivity extends Activity {
                 itemParams
         );
 
-        // 封面
         ImageView coverView =
                 new ImageView(this);
 
         coverView.setAdjustViewBounds(true);
 
-        /*
-         * 封面必须完整显示。
-         * FIT_CENTER 不会像 CENTER_CROP 那样裁剪照片。
-         */
         coverView.setScaleType(
                 ImageView.ScaleType.FIT_CENTER
         );
@@ -444,7 +423,6 @@ public class MainActivity extends Activity {
             );
         }
 
-        // 书名
         TextView nameView =
                 tv(
                         "📖 " +
@@ -468,12 +446,10 @@ public class MainActivity extends Activity {
                 )
         );
 
-        // 单击进入阅读器
         item.setOnClickListener(
                 v -> reader(book)
         );
 
-        // 长按管理书本
         item.setOnLongClickListener(
                 v -> {
 
@@ -534,17 +510,9 @@ public class MainActivity extends Activity {
 
         getCoverDir(book);
 
-        /*
-         * 恢复原来的行为：
-         * 创建书本以后直接进入阅读器。
-         */
         showShelf();
         reader(book);
     }
-
-    // ============================================================
-    // 管理书本
-    // ============================================================
 
     private void manageBook(final File book) {
 
@@ -631,7 +599,6 @@ public class MainActivity extends Activity {
                 )
         );
 
-        // 更换封面
         TextView coverBtn =
                 tv(
                         "更换封面",
@@ -661,10 +628,6 @@ public class MainActivity extends Activity {
         coverBtn.setOnClickListener(
                 v -> {
 
-                    /*
-                     * 暂存当前输入的书名。
-                     * 用户选择完封面后一起保存。
-                     */
                     pendingCoverDisplayName =
                             nameEdit
                                     .getText()
@@ -703,7 +666,6 @@ public class MainActivity extends Activity {
                 )
         );
 
-        // 删除书本
         TextView deleteBtn =
                 tv(
                         "删除书本",
@@ -871,10 +833,6 @@ public class MainActivity extends Activity {
         return file.delete();
     }
 
-    // ============================================================
-    // 图片列表
-    // ============================================================
-
     private ArrayList<File> images(File book) {
 
         File[] files =
@@ -887,12 +845,6 @@ public class MainActivity extends Activity {
 
             for (File file : files) {
 
-                /*
-                 * 只读取书本目录直接存在的图片。
-                 *
-                 * cover/ 是目录，因此不会把封面
-                 * 当成漫画正文。
-                 */
                 if (
                         file.isFile()
                                 && file.getName()
@@ -964,10 +916,6 @@ public class MainActivity extends Activity {
             }
         }
 
-        /*
-         * 如果有后来新加入的图片，
-         * 自动追加到末尾。
-         */
         for (File file : natural) {
 
             if (
@@ -1044,10 +992,6 @@ public class MainActivity extends Activity {
                 y.length
         );
     }
-
-    // ============================================================
-    // 阅读器
-    // ============================================================
 
     private void reader(File book) {
 
@@ -1254,9 +1198,6 @@ public class MainActivity extends Activity {
                 }
         );
 
-        /*
-         * 恢复之前保存的阅读位置。
-         */
         scrollView.post(
                 () -> {
 
@@ -1298,10 +1239,6 @@ public class MainActivity extends Activity {
 
         image.setAdjustViewBounds(true);
 
-        /*
-         * 正文漫画保持原来的 CENTER_CROP。
-         * 这次需求只改变封面，不动正文行为。
-         */
         image.setScaleType(
                 ImageView.ScaleType.CENTER_CROP
         );
@@ -1318,10 +1255,6 @@ public class MainActivity extends Activity {
                 )
         );
     }
-
-    // ============================================================
-    // 添加图片
-    // ============================================================
 
     private void pick(File book) {
 
@@ -1364,12 +1297,6 @@ public class MainActivity extends Activity {
                 data
         );
 
-        /*
-         * 用户取消选择图片时直接返回。
-         *
-         * 特别是换封面：
-         * 取消选择以后不会覆盖原来的封面。
-         */
         if (
                 resultCode != RESULT_OK ||
                         data == null ||
@@ -1428,10 +1355,6 @@ public class MainActivity extends Activity {
                         data.getData() != null
                 ) {
 
-                    /*
-                     * 如果用户在更换封面之前
-                     * 改了书名，这里一起保存。
-                     */
                     if (
                             pendingCoverDisplayName
                                     != null
@@ -1443,10 +1366,6 @@ public class MainActivity extends Activity {
                         );
                     }
 
-                    /*
-                     * 封面复制到 App 私有目录。
-                     * 不会删除/修改相册原图。
-                     */
                     copyImage(
                             data.getData(),
                             currentBook,
@@ -1504,10 +1423,6 @@ public class MainActivity extends Activity {
                             ".jpg";
         }
 
-        /*
-         * 添加正文图片时继续尽量使用
-         * 原来的文件名。
-         */
         Cursor cursor =
                 getContentResolver().query(
                         uri,
@@ -1600,10 +1515,6 @@ public class MainActivity extends Activity {
             }
         }
     }
-
-    // ============================================================
-    // 图片排序
-    // ============================================================
 
     private void sortMenu(File book) {
 
@@ -1856,10 +1767,6 @@ public class MainActivity extends Activity {
                 .apply();
     }
 
-    // ============================================================
-    // 管理图片
-    // ============================================================
-
     private void manageImages(
             final File book
     ) {
@@ -1891,16 +1798,18 @@ public class MainActivity extends Activity {
 
         scroll.addView(list);
 
-        final AlertDialog[] dialog =
-                new AlertDialog[1];
-
         /*
-         * 刷新当前 Dialog 里的图片列表。
+         * 关键修复：
+         * 不能直接在 refreshList 自己的初始化过程中
+         * 使用 refreshList.run()。
          *
-         * 这里不重新创建 Dialog，
-         * 因此不会出现“管理图片套管理图片”的问题。
+         * 用数组先创建引用，再给引用赋值，
+         * 这样 Runnable 内部就可以安全调用自己。
          */
-        final Runnable refreshList =
+        final Runnable[] refreshList =
+                new Runnable[1];
+
+        refreshList[0] =
                 new Runnable() {
 
                     @Override
@@ -2065,10 +1974,6 @@ public class MainActivity extends Activity {
                                                                             || !file.exists()
                                                             ) {
 
-                                                                /*
-                                                                 * 同时清除
-                                                                 * 排序记录里的文件名。
-                                                                 */
                                                                 cleanOrderAfterDelete(
                                                                         book,
                                                                         file.getName()
@@ -2080,7 +1985,10 @@ public class MainActivity extends Activity {
                                                                         Toast.LENGTH_SHORT
                                                                 ).show();
 
-                                                                refreshList.run();
+                                                                /*
+                                                                 * 这里也同步改成数组引用。
+                                                                 */
+                                                                refreshList[0].run();
 
                                                             } else {
 
@@ -2103,27 +2011,24 @@ public class MainActivity extends Activity {
                     }
                 };
 
-        refreshList.run();
+        refreshList[0].run();
 
-        dialog[0] =
-                new AlertDialog.Builder(this)
-                        .setTitle(
-                                "管理图片"
-                        )
-                        .setView(scroll)
-                        .setPositiveButton(
-                                "完成",
-                                (d, w) ->
-                                        reader(book)
-                        )
-                        .setNegativeButton(
-                                "关闭",
-                                (d, w) ->
-                                        reader(book)
-                        )
-                        .create();
-
-        dialog[0].show();
+        new AlertDialog.Builder(this)
+                .setTitle(
+                        "管理图片"
+                )
+                .setView(scroll)
+                .setPositiveButton(
+                        "完成",
+                        (d, w) ->
+                                reader(book)
+                )
+                .setNegativeButton(
+                        "关闭",
+                        (d, w) ->
+                                reader(book)
+                )
+                .show();
     }
 
     private void cleanOrderAfterDelete(
@@ -2186,10 +2091,6 @@ public class MainActivity extends Activity {
                     .apply();
         }
     }
-
-    // ============================================================
-    // 返回
-    // ============================================================
 
     @Override
     public void onBackPressed() {
