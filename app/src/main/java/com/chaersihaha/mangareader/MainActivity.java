@@ -1606,15 +1606,33 @@ public class MainActivity extends Activity {
 
                                         currentBook = null;
 
-                                        // 关键：
-                                        // 删除成功后关闭原来的
-                                        // “管理书本”窗口。
+                                        // 关闭外层“管理书本”窗口。
                                         dialog.dismiss();
 
                                         showShelf();
                                     }
                             )
                             .show();
+                }
+        );
+
+        // =====================================================
+        // 修复：
+        // 原来的管理书本 Dialog 没有透明 Window 背景，
+        // Android 默认 Dialog 背景会在我们的圆角面板
+        // 上下留下白色区域。
+        // =====================================================
+
+        dialog.setOnShowListener(
+                d -> {
+
+                    if (dialog.getWindow() != null) {
+
+                        dialog.getWindow()
+                                .setBackgroundDrawableResource(
+                                        android.R.color.transparent
+                                );
+                    }
                 }
         );
 
@@ -3056,22 +3074,40 @@ public class MainActivity extends Activity {
                                                                     && toIndex >= 0
                                                     ) {
 
+                                                        // =================================================
+                                                        // 修复图片排序方向 Bug
+                                                        //
+                                                        // 原来的代码：
+                                                        // fromIndex < toIndex 时 toIndex--
+                                                        //
+                                                        // 会导致：
+                                                        // 1 → 2 时重新插回 1 的位置，
+                                                        // 看起来就像完全没有移动。
+                                                        //
+                                                        // 现在采用真正的：
+                                                        // 删除原位置 → 重新查找目标 → 插入目标之前
+                                                        //
+                                                        // 因此上下两个方向完全对称。
+                                                        // =================================================
+
                                                         order.remove(
                                                                 fromIndex
                                                         );
 
+                                                        int newToIndex =
+                                                                order.indexOf(
+                                                                        file
+                                                                );
+
                                                         if (
-                                                                fromIndex
-                                                                        < toIndex
+                                                                newToIndex >= 0
                                                         ) {
 
-                                                            toIndex--;
+                                                            order.add(
+                                                                    newToIndex,
+                                                                    from
+                                                            );
                                                         }
-
-                                                        order.add(
-                                                                toIndex,
-                                                                from
-                                                        );
 
                                                         firstRender[0] =
                                                                 false;
