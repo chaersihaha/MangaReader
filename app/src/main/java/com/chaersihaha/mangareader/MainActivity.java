@@ -2,13 +2,16 @@ package com.chaersihaha.mangareader;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.graphics.BitmapFactory;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
-import android.graphics.Color;
-import android.net.Uri;
 import android.provider.OpenableColumns;
 import android.text.InputType;
 import android.view.Gravity;
@@ -228,66 +231,20 @@ public class MainActivity extends Activity {
                 && file.length() > 0;
     }
 
+    // ============================================================
+    // 沉浸式书架
+    // ============================================================
+
     private void showShelf() {
 
         currentBook = null;
 
         base();
 
-        TextView title =
-                tv(
-                        "MangaReader",
-                        26
-                );
-
-        title.setGravity(
-                Gravity.CENTER
-        );
-
-        root.addView(
-                title,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(64)
-                )
-        );
-
-        TextView create =
-                tv(
-                        "＋ 创建书本",
-                        20
-                );
-
-        create.setGravity(
-                Gravity.CENTER
-        );
-
-        create.setBackgroundColor(
-                Color.DKGRAY
-        );
-
-        root.addView(
-                create,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(56)
-                )
-        );
-
-        create.setOnClickListener(
-                v -> createBook()
-        );
-
-        shelf =
-                new LinearLayout(this);
-
-        shelf.setOrientation(
-                LinearLayout.VERTICAL
-        );
-
-        shelf.setBackgroundColor(
-                Color.BLACK
-        );
+        /*
+         * 整个书架不再使用标题栏。
+         * 打开软件以后直接看到封面。
+         */
 
         ScrollView shelfScroll =
                 new ScrollView(this);
@@ -296,7 +253,87 @@ public class MainActivity extends Activity {
                 Color.BLACK
         );
 
-        shelfScroll.addView(shelf);
+        shelfScroll.setFillViewport(true);
+
+        shelf =
+                new LinearLayout(this);
+
+        shelf.setOrientation(
+                LinearLayout.HORIZONTAL
+        );
+
+        shelf.setGravity(
+                Gravity.TOP
+        );
+
+        shelf.setPadding(
+                dp(6),
+                dp(6),
+                dp(6),
+                dp(80)
+        );
+
+        shelf.setBackgroundColor(
+                Color.BLACK
+        );
+
+        LinearLayout leftColumn =
+                new LinearLayout(this);
+
+        leftColumn.setOrientation(
+                LinearLayout.VERTICAL
+        );
+
+        leftColumn.setPadding(
+                dp(4),
+                dp(4),
+                dp(4),
+                dp(4)
+        );
+
+        leftColumn.setBackgroundColor(
+                Color.BLACK
+        );
+
+        LinearLayout rightColumn =
+                new LinearLayout(this);
+
+        rightColumn.setOrientation(
+                LinearLayout.VERTICAL
+        );
+
+        rightColumn.setPadding(
+                dp(4),
+                dp(4),
+                dp(4),
+                dp(4)
+        );
+
+        rightColumn.setBackgroundColor(
+                Color.BLACK
+        );
+
+        shelf.addView(
+                leftColumn,
+                new LinearLayout.LayoutParams(
+                        0,
+                        -2,
+                        1
+                )
+        );
+
+        shelf.addView(
+                rightColumn,
+                new LinearLayout.LayoutParams(
+                        0,
+                        -2,
+                        1
+                )
+        );
+
+        shelfScroll.addView(
+                shelf
+        );
 
         root.addView(
                 shelfScroll,
@@ -305,6 +342,74 @@ public class MainActivity extends Activity {
                         0,
                         1
                 )
+        );
+
+        /*
+         * 右下角创建按钮。
+         * 不再占用顶部空间，不影响封面墙。
+         */
+        TextView create =
+                new TextView(this);
+
+        create.setText("＋");
+        create.setTextSize(28);
+        create.setTextColor(Color.WHITE);
+        create.setGravity(Gravity.CENTER);
+        create.setTypeface(
+                Typeface.DEFAULT,
+                Typeface.BOLD
+        );
+
+        GradientDrawable createBg =
+                new GradientDrawable();
+
+        createBg.setColor(
+                Color.rgb(
+                        45,
+                        45,
+                        45
+                )
+        );
+
+        createBg.setShape(
+                GradientDrawable.OVAL
+        );
+
+        create.setBackground(
+                createBg
+        );
+
+        create.setElevation(
+                dp(8)
+        );
+
+        create.setOnClickListener(
+                v -> createBook()
+        );
+
+        root.addView(
+                create,
+                new LinearLayout.LayoutParams(
+                        dp(58),
+                        dp(58)
+                )
+        );
+
+        /*
+         * 把创建按钮移动到右下角。
+         */
+        create.post(
+                () -> {
+
+                    create.setTranslationX(
+                            root.getWidth()
+                                    - dp(70)
+                    );
+
+                    create.setTranslationY(
+                            -dp(70)
+                    );
+                }
         );
 
         File[] books =
@@ -331,61 +436,82 @@ public class MainActivity extends Activity {
                             )
             );
 
+            /*
+             * 瀑布式排列：
+             * 每一本书根据实际封面高度放入当前
+             * 较短的那一列。
+             *
+             * 不使用固定高度画框。
+             */
             for (File book : list) {
-                addBook(book);
+
+                if (
+                        leftColumn.getHeight()
+                                <= rightColumn.getHeight()
+                ) {
+
+                    addBook(
+                            leftColumn,
+                            book
+                    );
+
+                } else {
+
+                    addBook(
+                            rightColumn,
+                            book
+                    );
+                }
             }
         }
     }
 
-    private void addBook(File book) {
+    private void addBook(
+            LinearLayout column,
+            File book
+    ) {
 
         LinearLayout item =
                 new LinearLayout(this);
 
         item.setOrientation(
-                LinearLayout.HORIZONTAL
+                LinearLayout.VERTICAL
         );
 
         item.setGravity(
-                Gravity.CENTER_VERTICAL
+                Gravity.CENTER_HORIZONTAL
         );
 
         item.setBackgroundColor(
-                Color.rgb(
-                        30,
-                        30,
-                        30
-                )
+                Color.BLACK
         );
 
         item.setPadding(
-                dp(8),
-                dp(8),
-                dp(8),
-                dp(8)
+                dp(3),
+                dp(3),
+                dp(3),
+                dp(3)
         );
 
-        LinearLayout.LayoutParams itemParams =
+        column.addView(
+                item,
                 new LinearLayout.LayoutParams(
                         -1,
-                        dp(80)
-                );
-
-        itemParams.setMargins(
-                dp(4),
-                dp(4),
-                dp(4),
-                dp(4)
-        );
-
-        shelf.addView(
-                item,
-                itemParams
+                        -2
+                )
         );
 
         ImageView coverView =
                 new ImageView(this);
 
+        /*
+         * 最重要的地方：
+         *
+         * 不设置固定高度。
+         *
+         * 宽度由当前书架列决定，
+         * 高度根据图片原始宽高比自动计算。
+         */
         coverView.setAdjustViewBounds(true);
 
         coverView.setScaleType(
@@ -398,15 +524,15 @@ public class MainActivity extends Activity {
 
         LinearLayout.LayoutParams coverParams =
                 new LinearLayout.LayoutParams(
-                        dp(56),
-                        dp(64)
+                        -1,
+                        -2
                 );
 
         coverParams.setMargins(
                 0,
                 0,
-                dp(12),
-                0
+                0,
+                dp(6)
         );
 
         item.addView(
@@ -421,44 +547,252 @@ public class MainActivity extends Activity {
                             getCoverFile(book)
                     )
             );
+
+        } else {
+
+            /*
+             * 没有封面时只显示一个非常简单的占位。
+             * 不给它制造固定“画框”。
+             */
+            TextView noCover =
+                    tv(
+                            "暂无封面",
+                            14
+                    );
+
+            noCover.setGravity(
+                    Gravity.CENTER
+            );
+
+            noCover.setTextColor(
+                    Color.GRAY
+            );
+
+            item.removeView(
+                    coverView
+            );
+
+            item.addView(
+                    noCover,
+                    new LinearLayout.LayoutParams(
+                            -1,
+                            dp(180)
+                    )
+            );
         }
 
-        TextView nameView =
-                tv(
-                        "📖 " +
-                                getDisplayName(book),
-                        18
-                );
-
-        nameView.setPadding(
-                0,
-                0,
-                0,
-                0
+        /*
+         * 单击：
+         * 不再直接进入阅读器。
+         *
+         * 而是弹出当前书籍的操作窗口。
+         */
+        item.setOnClickListener(
+                v -> showBookMenu(book)
         );
 
-        item.addView(
-                nameView,
+        /*
+         * 不设置长按管理。
+         *
+         * 长按功能正式释放。
+         */
+    }
+
+    // ============================================================
+    // 点击书籍后的操作窗口
+    // ============================================================
+
+    private void showBookMenu(
+            final File book
+    ) {
+
+        LinearLayout panel =
+                new LinearLayout(this);
+
+        panel.setOrientation(
+                LinearLayout.VERTICAL
+        );
+
+        panel.setGravity(
+                Gravity.CENTER_HORIZONTAL
+        );
+
+        panel.setPadding(
+                dp(18),
+                dp(18),
+                dp(18),
+                dp(8)
+        );
+
+        panel.setBackgroundColor(
+                Color.BLACK
+        );
+
+        /*
+         * 弹窗顶部显示封面。
+         *
+         * 同样不裁剪封面。
+         */
+        ImageView cover =
+                new ImageView(this);
+
+        cover.setAdjustViewBounds(true);
+
+        cover.setScaleType(
+                ImageView.ScaleType.FIT_CENTER
+        );
+
+        cover.setBackgroundColor(
+                Color.BLACK
+        );
+
+        if (hasCover(book)) {
+
+            cover.setImageURI(
+                    Uri.fromFile(
+                            getCoverFile(book)
+                    )
+            );
+        }
+
+        LinearLayout.LayoutParams coverParams =
                 new LinearLayout.LayoutParams(
-                        0,
-                        -2,
-                        1
+                        -1,
+                        dp(220)
+                );
+
+        coverParams.setMargins(
+                0,
+                0,
+                0,
+                dp(12)
+        );
+
+        panel.addView(
+                cover,
+                coverParams
+        );
+
+        TextView name =
+                tv(
+                        getDisplayName(book),
+                        19
+                );
+
+        name.setGravity(
+                Gravity.CENTER
+        );
+
+        name.setTypeface(
+                Typeface.DEFAULT,
+                Typeface.BOLD
+        );
+
+        name.setPadding(
+                dp(8),
+                dp(4),
+                dp(8),
+                dp(16)
+        );
+
+        panel.addView(
+                name,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        -2
                 )
         );
 
-        item.setOnClickListener(
-                v -> reader(book)
+        TextView enter =
+                tv(
+                        "进入阅读",
+                        17
+                );
+
+        enter.setGravity(
+                Gravity.CENTER
         );
 
-        item.setOnLongClickListener(
+        enter.setBackgroundColor(
+                Color.rgb(
+                        55,
+                        55,
+                        55
+                )
+        );
+
+        panel.addView(
+                enter,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(52)
+                )
+        );
+
+        enter.setOnClickListener(
                 v -> {
 
-                    manageBook(book);
-
-                    return true;
+                    /*
+                     * 先关闭当前操作窗口，
+                     * 再进入阅读器。
+                     */
+                    reader(book);
                 }
         );
+
+        View spacer1 =
+                new View(this);
+
+        panel.addView(
+                spacer1,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(8)
+                )
+        );
+
+        TextView manage =
+                tv(
+                        "管理书本",
+                        17
+                );
+
+        manage.setGravity(
+                Gravity.CENTER
+        );
+
+        manage.setBackgroundColor(
+                Color.rgb(
+                        45,
+                        45,
+                        45
+                )
+        );
+
+        panel.addView(
+                manage,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(52)
+                )
+        );
+
+        manage.setOnClickListener(
+                v -> manageBook(book)
+        );
+
+        new AlertDialog.Builder(this)
+                .setView(panel)
+                .setNegativeButton(
+                        "取消",
+                        null
+                )
+                .show();
     }
+
+    // ============================================================
+    // 创建书本
+    // ============================================================
 
     private void createBook() {
 
@@ -513,6 +847,10 @@ public class MainActivity extends Activity {
         showShelf();
         reader(book);
     }
+
+    // ============================================================
+    // 管理书本
+    // ============================================================
 
     private void manageBook(final File book) {
 
@@ -833,6 +1171,10 @@ public class MainActivity extends Activity {
         return file.delete();
     }
 
+    // ============================================================
+    // 图片列表
+    // ============================================================
+
     private ArrayList<File> images(File book) {
 
         File[] files =
@@ -992,6 +1334,10 @@ public class MainActivity extends Activity {
                 y.length
         );
     }
+
+    // ============================================================
+    // 阅读器
+    // ============================================================
 
     private void reader(File book) {
 
@@ -1256,6 +1602,10 @@ public class MainActivity extends Activity {
         );
     }
 
+    // ============================================================
+    // 添加图片
+    // ============================================================
+
     private void pick(File book) {
 
         currentBook = book;
@@ -1516,6 +1866,10 @@ public class MainActivity extends Activity {
         }
     }
 
+    // ============================================================
+    // 图片排序
+    // ============================================================
+
     private void sortMenu(File book) {
 
         new AlertDialog.Builder(this)
@@ -1767,6 +2121,10 @@ public class MainActivity extends Activity {
                 .apply();
     }
 
+    // ============================================================
+    // 管理图片
+    // ============================================================
+
     private void manageImages(
             final File book
     ) {
@@ -1798,14 +2156,6 @@ public class MainActivity extends Activity {
 
         scroll.addView(list);
 
-        /*
-         * 关键修复：
-         * 不能直接在 refreshList 自己的初始化过程中
-         * 使用 refreshList.run()。
-         *
-         * 用数组先创建引用，再给引用赋值，
-         * 这样 Runnable 内部就可以安全调用自己。
-         */
         final Runnable[] refreshList =
                 new Runnable[1];
 
@@ -1985,9 +2335,6 @@ public class MainActivity extends Activity {
                                                                         Toast.LENGTH_SHORT
                                                                 ).show();
 
-                                                                /*
-                                                                 * 这里也同步改成数组引用。
-                                                                 */
                                                                 refreshList[0].run();
 
                                                             } else {
@@ -2091,6 +2438,10 @@ public class MainActivity extends Activity {
                     .apply();
         }
     }
+
+    // ============================================================
+    // 返回
+    // ============================================================
 
     @Override
     public void onBackPressed() {
