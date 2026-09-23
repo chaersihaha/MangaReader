@@ -1216,6 +1216,7 @@ public class MainActivity extends Activity {
                 );
 
         name.setGravity(Gravity.CENTER);
+
         name.setTypeface(
                 Typeface.DEFAULT,
                 Typeface.BOLD
@@ -1412,8 +1413,9 @@ public class MainActivity extends Activity {
 
         getCoverDir(book).mkdirs();
 
+        // 创建后只返回书架。
+        // 不自动进入阅读器。
         showShelf();
-        reader(book);
     }
 
     // =========================================================
@@ -1601,6 +1603,14 @@ public class MainActivity extends Activity {
                                     (d, which) -> {
 
                                         deleteBook(book);
+
+                                        currentBook = null;
+
+                                        // 关键：
+                                        // 删除成功后关闭原来的
+                                        // “管理书本”窗口。
+                                        dialog.dismiss();
+
                                         showShelf();
                                     }
                             )
@@ -2636,6 +2646,7 @@ public class MainActivity extends Activity {
                 new ScrollView(this);
 
         scroll.setFillViewport(true);
+
         scroll.setBackgroundColor(
                 Color.rgb(16, 16, 18)
         );
@@ -2662,7 +2673,7 @@ public class MainActivity extends Activity {
 
         TextView hint =
                 makeLabel(
-                        "长按文件名或右侧图标拖动调整顺序",
+                        "长按图片、文件名或右侧图标拖动调整顺序",
                         13,
                         TEXT_MUTED
                 );
@@ -2741,23 +2752,27 @@ public class MainActivity extends Activity {
                             );
 
                             row.setPadding(
-                                    dp(8),
-                                    dp(3),
-                                    dp(8),
-                                    dp(3)
+                                    dp(6),
+                                    dp(2),
+                                    dp(6),
+                                    dp(2)
                             );
 
                             row.setBackground(
                                     roundedBg(
                                             SURFACE_2,
-                                            10
+                                            9
                                     )
                             );
+
+                            // -------------------------------------------------
+                            // 序号
+                            // -------------------------------------------------
 
                             TextView number =
                                     makeLabel(
                                             String.valueOf(i + 1),
-                                            13,
+                                            12,
                                             TEXT_MUTED
                                     );
 
@@ -2768,10 +2783,60 @@ public class MainActivity extends Activity {
                             row.addView(
                                     number,
                                     new LinearLayout.LayoutParams(
-                                            dp(38),
-                                            dp(48)
+                                            dp(30),
+                                            dp(42)
                                     )
                             );
+
+                            // -------------------------------------------------
+                            // 小缩略图
+                            // 只用于辨认图片
+                            // -------------------------------------------------
+
+                            ImageView thumbnail =
+                                    new ImageView(
+                                            MainActivity.this
+                                    );
+
+                            thumbnail.setScaleType(
+                                    ImageView.ScaleType.CENTER_CROP
+                            );
+
+                            thumbnail.setImageURI(
+                                    Uri.fromFile(file)
+                            );
+
+                            thumbnail.setBackground(
+                                    roundedBg(
+                                            Color.rgb(18, 18, 20),
+                                            5
+                                    )
+                            );
+
+                            thumbnail.setClipToOutline(true);
+
+                            LinearLayout.LayoutParams
+                                    thumbnailParams =
+                                    new LinearLayout.LayoutParams(
+                                            dp(32),
+                                            dp(40)
+                                    );
+
+                            thumbnailParams.setMargins(
+                                    dp(2),
+                                    0,
+                                    dp(9),
+                                    0
+                            );
+
+                            row.addView(
+                                    thumbnail,
+                                    thumbnailParams
+                            );
+
+                            // -------------------------------------------------
+                            // 文件名
+                            // -------------------------------------------------
 
                             TextView name =
                                     makeLabel(
@@ -2795,15 +2860,19 @@ public class MainActivity extends Activity {
                                     name,
                                     new LinearLayout.LayoutParams(
                                             0,
-                                            dp(48),
+                                            dp(42),
                                             1
                                     )
                             );
 
+                            // -------------------------------------------------
+                            // 拖动图标
+                            // -------------------------------------------------
+
                             TextView drag =
                                     makeLabel(
                                             "☰",
-                                            19,
+                                            18,
                                             TEXT_MUTED
                                     );
 
@@ -2814,8 +2883,8 @@ public class MainActivity extends Activity {
                             row.addView(
                                     drag,
                                     new LinearLayout.LayoutParams(
-                                            dp(45),
-                                            dp(48)
+                                            dp(40),
+                                            dp(42)
                                     )
                             );
 
@@ -2823,14 +2892,14 @@ public class MainActivity extends Activity {
                                     rowParams =
                                     new LinearLayout.LayoutParams(
                                             -1,
-                                            dp(58)
+                                            dp(50)
                                     );
 
                             rowParams.setMargins(
                                     0,
-                                    dp(3),
+                                    dp(2),
                                     0,
-                                    dp(3)
+                                    dp(2)
                             );
 
                             listContainer.addView(
@@ -2843,11 +2912,15 @@ public class MainActivity extends Activity {
                                 animateAppear(
                                         row,
                                         Math.min(
-                                                i * 18L,
-                                                180L
+                                                i * 16L,
+                                                160L
                                         )
                                 );
                             }
+
+                            // -------------------------------------------------
+                            // 长按开始拖动
+                            // -------------------------------------------------
 
                             View.OnLongClickListener
                                     startDrag =
@@ -2895,6 +2968,10 @@ public class MainActivity extends Activity {
                                     startDrag
                             );
 
+                            thumbnail.setOnLongClickListener(
+                                    startDrag
+                            );
+
                             name.setOnLongClickListener(
                                     startDrag
                             );
@@ -2902,6 +2979,10 @@ public class MainActivity extends Activity {
                             drag.setOnLongClickListener(
                                     startDrag
                             );
+
+                            // -------------------------------------------------
+                            // 拖动目标
+                            // -------------------------------------------------
 
                             row.setOnDragListener(
                                     (v, event) -> {
@@ -2995,8 +3076,7 @@ public class MainActivity extends Activity {
                                                         firstRender[0] =
                                                                 false;
 
-                                                        refresh[0]
-                                                                .run();
+                                                        refresh[0].run();
                                                     }
                                                 }
 
