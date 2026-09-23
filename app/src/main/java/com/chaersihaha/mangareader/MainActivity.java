@@ -29,7 +29,6 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -70,7 +69,13 @@ public class MainActivity extends Activity {
     }
 
     private int dp(int value) {
-        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+        return (int) (
+                value *
+                        getResources()
+                                .getDisplayMetrics()
+                                .density
+                        + 0.5f
+        );
     }
 
     private void base() {
@@ -440,7 +445,6 @@ public class MainActivity extends Activity {
         list.clear();
         list.addAll(ordered);
 
-        // 清理已经不存在的书本 ID
         saveShelfOrder(list);
     }
 
@@ -722,7 +726,10 @@ public class MainActivity extends Activity {
                     View.DragShadowBuilder shadow =
                             new View.DragShadowBuilder(v);
 
-                    if (android.os.Build.VERSION.SDK_INT >= 24) {
+                    if (
+                            android.os.Build.VERSION.SDK_INT
+                                    >= 24
+                    ) {
 
                         v.startDragAndDrop(
                                 null,
@@ -1072,9 +1079,6 @@ public class MainActivity extends Activity {
                 manageParams
         );
 
-        final AlertDialog[] bookDialog =
-                new AlertDialog[1];
-
         AlertDialog dialog =
                 new AlertDialog.Builder(this)
                         .setView(panel)
@@ -1083,8 +1087,6 @@ public class MainActivity extends Activity {
                                 null
                         )
                         .create();
-
-        bookDialog[0] = dialog;
 
         read.setOnClickListener(
                 v -> {
@@ -1985,30 +1987,8 @@ public class MainActivity extends Activity {
                 }
         );
 
-        int savedY =
-                sp.getInt(
-                        "y_" + book.getName(),
-                        0
-                );
-
-        scroll.post(
-                () -> scroll.scrollTo(
-                        0,
-                        savedY
-                )
-        );
-
-        scroll.setOnScrollChangeListener(
-                (v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
-
-                    sp.edit()
-                            .putInt(
-                                    "y_" + book.getName(),
-                                    scrollY
-                            )
-                            .apply();
-                }
-        );
+        // 不再恢复上次阅读位置。
+        // 每次进入 reader() 都从顶部开始。
 
         sort.setOnClickListener(
                 v -> sortImages(book)
@@ -2204,8 +2184,10 @@ public class MainActivity extends Activity {
                                 OpenableColumns.DISPLAY_NAME
                         );
 
-                if (index >= 0
-                        && cursor.moveToFirst()) {
+                if (
+                        index >= 0
+                                && cursor.moveToFirst()
+                ) {
 
                     String name =
                             cursor.getString(index);
@@ -2395,24 +2377,7 @@ public class MainActivity extends Activity {
             File book
     ) {
 
-        ArrayList<File> list =
-                images(book);
-
-        Collections.sort(
-                list,
-                (a, b) ->
-                        naturalCompare(
-                                a.getName(),
-                                b.getName()
-                        )
-        );
-
-        saveImageOrder(
-                book,
-                list
-        );
-
-        reader(book);
+        manualSortImages(book);
     }
 
     private void saveImageOrder(
@@ -2447,13 +2412,13 @@ public class MainActivity extends Activity {
     // =========================================================
 
     private void manualSortImages(
-            File book
+            final File book
     ) {
 
-        ArrayList<File> list =
+        final ArrayList<File> order =
                 images(book);
 
-        if (list.size() < 2) {
+        if (order.size() < 2) {
 
             Toast.makeText(
                     this,
@@ -2464,30 +2429,474 @@ public class MainActivity extends Activity {
             return;
         }
 
-        String[] names =
-                new String[list.size()];
+        final LinearLayout listContainer =
+                new LinearLayout(this);
 
-        for (
-                int i = 0;
-                i < list.size();
-                i++
-        ) {
+        listContainer.setOrientation(
+                LinearLayout.VERTICAL
+        );
 
-            names[i] =
-                    list.get(i).getName();
-        }
+        listContainer.setPadding(
+                dp(8),
+                dp(4),
+                dp(8),
+                dp(4)
+        );
 
-        new AlertDialog.Builder(this)
-                .setTitle("图片排序")
-                .setItems(
-                        names,
-                        null
+        ScrollView scroll =
+                new ScrollView(this);
+
+        scroll.setFillViewport(true);
+
+        scroll.addView(
+                listContainer
+        );
+
+        LinearLayout panel =
+                new LinearLayout(this);
+
+        panel.setOrientation(
+                LinearLayout.VERTICAL
+        );
+
+        panel.setPadding(
+                dp(8),
+                dp(8),
+                dp(8),
+                dp(4)
+        );
+
+        TextView hint =
+                new TextView(this);
+
+        hint.setText(
+                "长按文件名拖动，可以调整图片顺序"
+        );
+
+        hint.setTextSize(13);
+
+        hint.setTextColor(
+                Color.rgb(
+                        130,
+                        130,
+                        130
                 )
-                .setNegativeButton(
-                        "取消",
-                        null
+        );
+
+        hint.setPadding(
+                dp(6),
+                dp(2),
+                dp(6),
+                dp(8)
+        );
+
+        panel.addView(
+                hint,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        -2
                 )
-                .show();
+        );
+
+        panel.addView(
+                scroll,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(430)
+                )
+        );
+
+        AlertDialog dialog =
+                new AlertDialog.Builder(this)
+                        .setTitle("图片排序")
+                        .setView(panel)
+                        .setNegativeButton(
+                                "取消",
+                                null
+                        )
+                        .setPositiveButton(
+                                "完成",
+                                null
+                        )
+                        .create();
+
+        final Runnable[] refresh =
+                new Runnable[1];
+
+        refresh[0] =
+                new Runnable() {
+
+                    @Override
+                    public void run() {
+
+                        listContainer.removeAllViews();
+
+                        for (
+                                int i = 0;
+                                i < order.size();
+                                i++
+                        ) {
+
+                            final File file =
+                                    order.get(i);
+
+                            final LinearLayout row =
+                                    new LinearLayout(
+                                            MainActivity.this
+                                    );
+
+                            row.setOrientation(
+                                    LinearLayout.HORIZONTAL
+                            );
+
+                            row.setGravity(
+                                    Gravity.CENTER_VERTICAL
+                            );
+
+                            row.setPadding(
+                                    dp(8),
+                                    dp(5),
+                                    dp(8),
+                                    dp(5)
+                            );
+
+                            GradientDrawable rowBg =
+                                    new GradientDrawable();
+
+                            rowBg.setColor(
+                                    Color.rgb(
+                                            28,
+                                            28,
+                                            28
+                                    )
+                            );
+
+                            rowBg.setCornerRadius(
+                                    dp(7)
+                            );
+
+                            row.setBackground(
+                                    rowBg
+                            );
+
+                            TextView number =
+                                    new TextView(
+                                            MainActivity.this
+                                    );
+
+                            number.setText(
+                                    String.valueOf(
+                                            i + 1
+                                    )
+                            );
+
+                            number.setTextSize(13);
+
+                            number.setTextColor(
+                                    Color.rgb(
+                                            120,
+                                            120,
+                                            120
+                                    )
+                            );
+
+                            number.setGravity(
+                                    Gravity.CENTER
+                            );
+
+                            row.addView(
+                                    number,
+                                    new LinearLayout.LayoutParams(
+                                            dp(38),
+                                            dp(48)
+                                    )
+                            );
+
+                            TextView name =
+                                    new TextView(
+                                            MainActivity.this
+                                    );
+
+                            name.setText(
+                                    file.getName()
+                            );
+
+                            name.setTextSize(14);
+
+                            name.setTextColor(
+                                    Color.WHITE
+                            );
+
+                            name.setGravity(
+                                    Gravity.CENTER_VERTICAL
+                            );
+
+                            name.setSingleLine(
+                                    true
+                            );
+
+                            name.setEllipsize(
+                                    android.text.TextUtils.TruncateAt.MIDDLE
+                            );
+
+                            row.addView(
+                                    name,
+                                    new LinearLayout.LayoutParams(
+                                            0,
+                                            dp(48),
+                                            1
+                                    )
+                            );
+
+                            TextView drag =
+                                    new TextView(
+                                            MainActivity.this
+                                    );
+
+                            drag.setText("☰");
+
+                            drag.setTextSize(20);
+
+                            drag.setTextColor(
+                                    Color.rgb(
+                                            125,
+                                            125,
+                                            125
+                                    )
+                            );
+
+                            drag.setGravity(
+                                    Gravity.CENTER
+                            );
+
+                            row.addView(
+                                    drag,
+                                    new LinearLayout.LayoutParams(
+                                            dp(45),
+                                            dp(48)
+                                    )
+                            );
+
+                            LinearLayout.LayoutParams
+                                    rowParams =
+                                    new LinearLayout.LayoutParams(
+                                            -1,
+                                            dp(58)
+                                    );
+
+                            rowParams.setMargins(
+                                    0,
+                                    dp(3),
+                                    0,
+                                    dp(3)
+                            );
+
+                            listContainer.addView(
+                                    row,
+                                    rowParams
+                            );
+
+                            View.OnLongClickListener
+                                    startDrag =
+                                    v -> {
+
+                                        row.setAlpha(
+                                                0.65f
+                                        );
+
+                                        View.DragShadowBuilder
+                                                shadow =
+                                                new View.DragShadowBuilder(
+                                                        row
+                                                );
+
+                                        if (
+                                                android.os.Build.VERSION.SDK_INT
+                                                        >= 24
+                                        ) {
+
+                                            row.startDragAndDrop(
+                                                    null,
+                                                    shadow,
+                                                    file,
+                                                    0
+                                            );
+
+                                        } else {
+
+                                            row.startDrag(
+                                                    null,
+                                                    shadow,
+                                                    file,
+                                                    0
+                                            );
+                                        }
+
+                                        return true;
+                                    };
+
+                            row.setOnLongClickListener(
+                                    startDrag
+                            );
+
+                            name.setOnLongClickListener(
+                                    startDrag
+                            );
+
+                            drag.setOnLongClickListener(
+                                    startDrag
+                            );
+
+                            row.setOnDragListener(
+                                    (v, event) -> {
+
+                                        switch (
+                                                event.getAction()
+                                        ) {
+
+                                            case android.view.DragEvent
+                                                    .ACTION_DRAG_STARTED:
+
+                                                return event
+                                                        .getLocalState()
+                                                        instanceof File;
+
+                                            case android.view.DragEvent
+                                                    .ACTION_DRAG_ENTERED:
+
+                                                File entered =
+                                                        (File) event
+                                                                .getLocalState();
+
+                                                if (
+                                                        entered != file
+                                                ) {
+
+                                                    row.animate()
+                                                            .scaleX(
+                                                                    0.97f
+                                                            )
+                                                            .scaleY(
+                                                                    0.97f
+                                                            )
+                                                            .setDuration(
+                                                                    80
+                                                            )
+                                                            .start();
+                                                }
+
+                                                return true;
+
+                                            case android.view.DragEvent
+                                                    .ACTION_DRAG_EXITED:
+
+                                                row.animate()
+                                                        .scaleX(1f)
+                                                        .scaleY(1f)
+                                                        .setDuration(
+                                                                80
+                                                        )
+                                                        .start();
+
+                                                return true;
+
+                                            case android.view.DragEvent
+                                                    .ACTION_DROP:
+
+                                                File from =
+                                                        (File) event
+                                                                .getLocalState();
+
+                                                if (
+                                                        from != null
+                                                                && from != file
+                                                ) {
+
+                                                    int fromIndex =
+                                                            order.indexOf(
+                                                                    from
+                                                            );
+
+                                                    int toIndex =
+                                                            order.indexOf(
+                                                                    file
+                                                            );
+
+                                                    if (
+                                                            fromIndex >= 0
+                                                                    && toIndex >= 0
+                                                    ) {
+
+                                                        order.remove(
+                                                                fromIndex
+                                                        );
+
+                                                        if (
+                                                                fromIndex
+                                                                        < toIndex
+                                                        ) {
+
+                                                            toIndex--;
+                                                        }
+
+                                                        order.add(
+                                                                toIndex,
+                                                                from
+                                                        );
+
+                                                        refresh[0]
+                                                                .run();
+                                                    }
+                                                }
+
+                                                return true;
+
+                                            case android.view.DragEvent
+                                                    .ACTION_DRAG_ENDED:
+
+                                                row.animate()
+                                                        .scaleX(1f)
+                                                        .scaleY(1f)
+                                                        .alpha(1f)
+                                                        .setDuration(
+                                                                100
+                                                        )
+                                                        .start();
+
+                                                return true;
+                                        }
+
+                                        return true;
+                                    }
+                            );
+                        }
+                    }
+                };
+
+        refresh[0].run();
+
+        dialog.setOnShowListener(
+                d -> {
+
+                    dialog.getButton(
+                            AlertDialog.BUTTON_POSITIVE
+                    ).setOnClickListener(
+                            v -> {
+
+                                saveImageOrder(
+                                        book,
+                                        order
+                                );
+
+                                dialog.dismiss();
+
+                                reader(book);
+                            }
+                    );
+                }
+        );
+
+        dialog.show();
     }
 
     // =========================================================
@@ -2497,9 +2906,6 @@ public class MainActivity extends Activity {
     private void manageImages(
             final File book
     ) {
-
-        final ArrayList<File> list =
-                images(book);
 
         LinearLayout panel =
                 new LinearLayout(this);
@@ -2566,6 +2972,9 @@ public class MainActivity extends Activity {
                         for (
                                 File file : current
                         ) {
+
+                            final File targetFile =
+                                    file;
 
                             LinearLayout row =
                                     new LinearLayout(
@@ -2678,7 +3087,7 @@ public class MainActivity extends Activity {
                                     v -> {
 
                                         if (
-                                                file.delete()
+                                                targetFile.delete()
                                         ) {
 
                                             ArrayList<File>
@@ -2690,8 +3099,17 @@ public class MainActivity extends Activity {
                                                     after
                                             );
 
-                                            refreshList[0]
-                                                    .run();
+                                            // 立即刷新阅读器
+                                            dialog.dismiss();
+                                            reader(book);
+
+                                        } else {
+
+                                            Toast.makeText(
+                                                    MainActivity.this,
+                                                    "删除失败",
+                                                    Toast.LENGTH_SHORT
+                                            ).show();
                                         }
                                     }
                             );
