@@ -2,7 +2,6 @@ package com.chaersihaha.mangareader;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -20,6 +19,7 @@ import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -60,6 +60,8 @@ public class MainActivity extends Activity {
         );
 
         booksDir.mkdirs();
+
+        setTitle("GPT漫画");
 
         showShelf();
     }
@@ -232,7 +234,7 @@ public class MainActivity extends Activity {
     }
 
     // ============================================================
-    // 沉浸式书架
+    // GPT漫画 主界面
     // ============================================================
 
     private void showShelf() {
@@ -242,9 +244,120 @@ public class MainActivity extends Activity {
         base();
 
         /*
-         * 整个书架不再使用标题栏。
-         * 打开软件以后直接看到封面。
+         * 顶部只保留非常简单的品牌区域。
+         *
+         * 不做复杂导航栏，不占用太多空间。
          */
+        LinearLayout header =
+                new LinearLayout(this);
+
+        header.setOrientation(
+                LinearLayout.HORIZONTAL
+        );
+
+        header.setGravity(
+                Gravity.CENTER_VERTICAL
+        );
+
+        header.setPadding(
+                dp(18),
+                dp(8),
+                dp(18),
+                dp(6)
+        );
+
+        header.setBackgroundColor(
+                Color.BLACK
+        );
+
+        TextView title =
+                new TextView(this);
+
+        title.setText(
+                "GPT漫画"
+        );
+
+        title.setTextSize(
+                21
+        );
+
+        title.setTextColor(
+                Color.WHITE
+        );
+
+        title.setTypeface(
+                Typeface.DEFAULT,
+                Typeface.BOLD
+        );
+
+        title.setGravity(
+                Gravity.CENTER_VERTICAL
+        );
+
+        header.addView(
+                title,
+                new LinearLayout.LayoutParams(
+                        -2,
+                        -1
+                )
+        );
+
+        TextView subtitle =
+                new TextView(this);
+
+        subtitle.setText(
+                "  我的书库"
+        );
+
+        subtitle.setTextSize(
+                13
+        );
+
+        subtitle.setTextColor(
+                Color.GRAY
+        );
+
+        subtitle.setGravity(
+                Gravity.CENTER_VERTICAL
+        );
+
+        header.addView(
+                subtitle,
+                new LinearLayout.LayoutParams(
+                        -2,
+                        -1
+                )
+        );
+
+        root.addView(
+                header,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(58)
+                )
+        );
+
+        /*
+         * 使用 FrameLayout 作为书架容器。
+         *
+         * 这样右下角按钮是真正的悬浮按钮，
+         * 不需要 TranslationX / TranslationY 硬挪位置。
+         */
+        FrameLayout shelfContainer =
+                new FrameLayout(this);
+
+        shelfContainer.setBackgroundColor(
+                Color.BLACK
+        );
+
+        root.addView(
+                shelfContainer,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        0,
+                        1
+                )
+        );
 
         ScrollView shelfScroll =
                 new ScrollView(this);
@@ -267,10 +380,10 @@ public class MainActivity extends Activity {
         );
 
         shelf.setPadding(
-                dp(6),
-                dp(6),
-                dp(6),
-                dp(80)
+                dp(7),
+                dp(4),
+                dp(7),
+                dp(84)
         );
 
         shelf.setBackgroundColor(
@@ -335,18 +448,16 @@ public class MainActivity extends Activity {
                 shelf
         );
 
-        root.addView(
+        shelfContainer.addView(
                 shelfScroll,
-                new LinearLayout.LayoutParams(
+                new FrameLayout.LayoutParams(
                         -1,
-                        0,
-                        1
+                        -1
                 )
         );
 
         /*
-         * 右下角创建按钮。
-         * 不再占用顶部空间，不影响封面墙。
+         * 右下角悬浮创建按钮。
          */
         TextView create =
                 new TextView(this);
@@ -355,6 +466,7 @@ public class MainActivity extends Activity {
         create.setTextSize(28);
         create.setTextColor(Color.WHITE);
         create.setGravity(Gravity.CENTER);
+
         create.setTypeface(
                 Typeface.DEFAULT,
                 Typeface.BOLD
@@ -365,9 +477,9 @@ public class MainActivity extends Activity {
 
         createBg.setColor(
                 Color.rgb(
-                        45,
-                        45,
-                        45
+                        48,
+                        48,
+                        48
                 )
         );
 
@@ -387,29 +499,24 @@ public class MainActivity extends Activity {
                 v -> createBook()
         );
 
-        root.addView(
-                create,
-                new LinearLayout.LayoutParams(
+        FrameLayout.LayoutParams createParams =
+                new FrameLayout.LayoutParams(
                         dp(58),
-                        dp(58)
-                )
+                        dp(58),
+                        Gravity.BOTTOM
+                                | Gravity.END
+                );
+
+        createParams.setMargins(
+                dp(12),
+                dp(12),
+                dp(18),
+                dp(18)
         );
 
-        /*
-         * 把创建按钮移动到右下角。
-         */
-        create.post(
-                () -> {
-
-                    create.setTranslationX(
-                            root.getWidth()
-                                    - dp(70)
-                    );
-
-                    create.setTranslationY(
-                            -dp(70)
-                    );
-                }
+        shelfContainer.addView(
+                create,
+                createParams
         );
 
         File[] books =
@@ -437,18 +544,27 @@ public class MainActivity extends Activity {
             );
 
             /*
-             * 瀑布式排列：
-             * 每一本书根据实际封面高度放入当前
-             * 较短的那一列。
+             * 不在这里读取 getHeight()。
              *
-             * 不使用固定高度画框。
+             * Android 在尚未完成 measure/layout 时，
+             * getHeight() 很可能全部是 0，
+             * 导致所有书被塞进同一列。
+             *
+             * 这里采用稳定的交替分栏。
+             *
+             * 两列内部仍然是自然高度排列，
+             * 因此不会发生封面互相覆盖。
              */
-            for (File book : list) {
+            for (
+                    int i = 0;
+                    i < list.size();
+                    i++
+            ) {
 
-                if (
-                        leftColumn.getHeight()
-                                <= rightColumn.getHeight()
-                ) {
+                File book =
+                        list.get(i);
+
+                if (i % 2 == 0) {
 
                     addBook(
                             leftColumn,
@@ -490,7 +606,7 @@ public class MainActivity extends Activity {
                 dp(3),
                 dp(3),
                 dp(3),
-                dp(3)
+                dp(5)
         );
 
         column.addView(
@@ -505,12 +621,10 @@ public class MainActivity extends Activity {
                 new ImageView(this);
 
         /*
-         * 最重要的地方：
+         * 不限制封面高度。
          *
-         * 不设置固定高度。
-         *
-         * 宽度由当前书架列决定，
-         * 高度根据图片原始宽高比自动计算。
+         * 宽度根据当前列决定，
+         * 高度根据原始图片比例自动计算。
          */
         coverView.setAdjustViewBounds(true);
 
@@ -532,7 +646,7 @@ public class MainActivity extends Activity {
                 0,
                 0,
                 0,
-                dp(6)
+                dp(5)
         );
 
         item.addView(
@@ -550,10 +664,6 @@ public class MainActivity extends Activity {
 
         } else {
 
-            /*
-             * 没有封面时只显示一个非常简单的占位。
-             * 不给它制造固定“画框”。
-             */
             TextView noCover =
                     tv(
                             "暂无封面",
@@ -566,6 +676,14 @@ public class MainActivity extends Activity {
 
             noCover.setTextColor(
                     Color.GRAY
+            );
+
+            noCover.setBackgroundColor(
+                    Color.rgb(
+                            18,
+                            18,
+                            18
+                    )
             );
 
             item.removeView(
@@ -582,19 +700,15 @@ public class MainActivity extends Activity {
         }
 
         /*
-         * 单击：
-         * 不再直接进入阅读器。
-         *
-         * 而是弹出当前书籍的操作窗口。
+         * 单击封面：
+         * 打开操作窗口。
          */
         item.setOnClickListener(
                 v -> showBookMenu(book)
         );
 
         /*
-         * 不设置长按管理。
-         *
-         * 长按功能正式释放。
+         * 长按故意不设置。
          */
     }
 
@@ -628,11 +742,6 @@ public class MainActivity extends Activity {
                 Color.BLACK
         );
 
-        /*
-         * 弹窗顶部显示封面。
-         *
-         * 同样不裁剪封面。
-         */
         ImageView cover =
                 new ImageView(this);
 
@@ -729,17 +838,6 @@ public class MainActivity extends Activity {
                 )
         );
 
-        enter.setOnClickListener(
-                v -> {
-
-                    /*
-                     * 先关闭当前操作窗口，
-                     * 再进入阅读器。
-                     */
-                    reader(book);
-                }
-        );
-
         View spacer1 =
                 new View(this);
 
@@ -777,17 +875,57 @@ public class MainActivity extends Activity {
                 )
         );
 
-        manage.setOnClickListener(
-                v -> manageBook(book)
+        /*
+         * 用数组保存 Dialog。
+         *
+         * 点击按钮时先 dismiss，
+         * 再切换页面。
+         *
+         * 这就是本次重点修复的地方。
+         */
+        final AlertDialog[] bookDialog =
+                new AlertDialog[1];
+
+        bookDialog[0] =
+                new AlertDialog.Builder(this)
+                        .setView(panel)
+                        .setNegativeButton(
+                                "取消",
+                                null
+                        )
+                        .create();
+
+        enter.setOnClickListener(
+                v -> {
+
+                    if (
+                            bookDialog[0] != null
+                    ) {
+
+                        bookDialog[0]
+                                .dismiss();
+                    }
+
+                    reader(book);
+                }
         );
 
-        new AlertDialog.Builder(this)
-                .setView(panel)
-                .setNegativeButton(
-                        "取消",
-                        null
-                )
-                .show();
+        manage.setOnClickListener(
+                v -> {
+
+                    if (
+                            bookDialog[0] != null
+                    ) {
+
+                        bookDialog[0]
+                                .dismiss();
+                    }
+
+                    manageBook(book);
+                }
+        );
+
+        bookDialog[0].show();
     }
 
     // ============================================================
