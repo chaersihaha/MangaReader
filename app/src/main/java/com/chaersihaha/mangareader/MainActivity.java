@@ -69,6 +69,97 @@ public class MainActivity extends Activity {
     private static final int ACCENT =
             Color.rgb(214, 214, 220);
 
+    // =========================================================
+    // 2.0 动画系统
+    // =========================================================
+
+    private void animateAppear(
+            View view,
+            long delay
+    ) {
+
+        view.setAlpha(0f);
+        view.setTranslationY(dp(10));
+
+        view.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setStartDelay(delay)
+                .setDuration(260)
+                .setInterpolator(
+                        new android.view.animation.DecelerateInterpolator(1.6f)
+                )
+                .start();
+    }
+
+    private void animateDialogIn(
+            View view
+    ) {
+
+        view.setAlpha(0f);
+        view.setScaleX(0.96f);
+        view.setScaleY(0.96f);
+        view.setTranslationY(dp(8));
+
+        view.animate()
+                .alpha(1f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .translationY(0f)
+                .setDuration(220)
+                .setInterpolator(
+                        new android.view.animation.DecelerateInterpolator(1.5f)
+                )
+                .start();
+    }
+
+    private void animateControlIn(
+            View view
+    ) {
+
+        view.setAlpha(0f);
+        view.setTranslationY(dp(20));
+
+        view.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(190)
+                .setInterpolator(
+                        new android.view.animation.DecelerateInterpolator(1.7f)
+                )
+                .start();
+    }
+
+    private void animateButtonPress(
+            final View view
+    ) {
+
+        view.animate()
+                .scaleX(0.96f)
+                .scaleY(0.96f)
+                .alpha(0.68f)
+                .setDuration(75)
+                .setInterpolator(
+                        new android.view.animation.DecelerateInterpolator()
+                )
+                .start();
+    }
+
+    private void animateButtonRelease(
+            final View view
+    ) {
+
+        view.animate()
+                .scaleX(1f)
+                .scaleY(1f)
+                .alpha(1f)
+                .setDuration(150)
+                .setInterpolator(
+                        new android.view.animation.OvershootInterpolator(1.05f)
+                )
+                .start();
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -228,10 +319,6 @@ public class MainActivity extends Activity {
         currentBook = null;
         base();
 
-        // -----------------------------------------------------
-        // 顶部标题
-        // -----------------------------------------------------
-
         LinearLayout header =
                 new LinearLayout(this);
 
@@ -245,7 +332,7 @@ public class MainActivity extends Activity {
 
         header.setPadding(
                 dp(20),
-                dp(18),
+                dp(12),
                 dp(20),
                 dp(12)
         );
@@ -298,13 +385,11 @@ public class MainActivity extends Activity {
                 header,
                 new LinearLayout.LayoutParams(
                         -1,
-                        dp(76)
+                        dp(82)
                 )
         );
 
-        // -----------------------------------------------------
-        // 内容区域
-        // -----------------------------------------------------
+        animateAppear(header, 0);
 
         FrameLayout shelfContainer =
                 new FrameLayout(this);
@@ -353,10 +438,6 @@ public class MainActivity extends Activity {
                 )
         );
 
-        // -----------------------------------------------------
-        // 新建按钮
-        // -----------------------------------------------------
-
         TextView create =
                 new TextView(this);
 
@@ -380,24 +461,32 @@ public class MainActivity extends Activity {
 
         create.setElevation(dp(8));
 
-        create.setOnClickListener(
-                v -> {
+        create.setOnTouchListener(
+                (v, event) -> {
 
-                    v.animate()
-                            .scaleX(0.91f)
-                            .scaleY(0.91f)
-                            .setDuration(70)
-                            .withEndAction(() ->
-                                    v.animate()
-                                            .scaleX(1f)
-                                            .scaleY(1f)
-                                            .setDuration(100)
-                                            .start()
-                            )
-                            .start();
+                    if (
+                            event.getAction()
+                                    == MotionEvent.ACTION_DOWN
+                    ) {
 
-                    createBook();
+                        animateButtonPress(v);
+
+                    } else if (
+                            event.getAction()
+                                    == MotionEvent.ACTION_UP
+                                    || event.getAction()
+                                    == MotionEvent.ACTION_CANCEL
+                    ) {
+
+                        animateButtonRelease(v);
+                    }
+
+                    return false;
                 }
+        );
+
+        create.setOnClickListener(
+                v -> createBook()
         );
 
         FrameLayout.LayoutParams createParams =
@@ -418,6 +507,8 @@ public class MainActivity extends Activity {
                 create,
                 createParams
         );
+
+        animateAppear(create, 180);
 
         File[] books =
                 booksDir.listFiles();
@@ -547,6 +638,10 @@ public class MainActivity extends Activity {
                         dp(340)
                 )
         );
+
+        animateAppear(icon, 80);
+        animateAppear(title, 150);
+        animateAppear(hint, 210);
     }
 
     private void loadShelfOrder(
@@ -708,6 +803,11 @@ public class MainActivity extends Activity {
                         )
                 );
             }
+
+            animateAppear(
+                    row,
+                    (i / 2) * 35L
+            );
         }
     }
 
@@ -858,12 +958,22 @@ public class MainActivity extends Activity {
                     v.animate()
                             .scaleX(0.975f)
                             .scaleY(0.975f)
+                            .alpha(0.92f)
                             .setDuration(70)
+                            .setInterpolator(
+                                    new android.view.animation.DecelerateInterpolator()
+                            )
                             .withEndAction(() ->
                                     v.animate()
                                             .scaleX(1f)
                                             .scaleY(1f)
-                                            .setDuration(100)
+                                            .alpha(1f)
+                                            .setDuration(150)
+                                            .setInterpolator(
+                                                    new android.view.animation.OvershootInterpolator(
+                                                            1.05f
+                                                    )
+                                            )
                                             .start()
                             )
                             .start();
@@ -882,6 +992,9 @@ public class MainActivity extends Activity {
                             .scaleX(1.035f)
                             .scaleY(1.035f)
                             .setDuration(120)
+                            .setInterpolator(
+                                    new android.view.animation.DecelerateInterpolator()
+                            )
                             .start();
 
                     v.setAlpha(0.82f);
@@ -1186,6 +1299,8 @@ public class MainActivity extends Activity {
         );
 
         dialog.show();
+
+        animateDialogIn(panel);
     }
 
     private LinearLayout.LayoutParams actionParams(
@@ -1241,14 +1356,16 @@ public class MainActivity extends Activity {
                                     == MotionEvent.ACTION_DOWN
                     ) {
 
-                        v.setAlpha(0.65f);
+                        animateButtonPress(v);
 
                     } else if (
                             event.getAction()
                                     == MotionEvent.ACTION_UP
+                                    || event.getAction()
+                                    == MotionEvent.ACTION_CANCEL
                     ) {
 
-                        v.setAlpha(1f);
+                        animateButtonRelease(v);
                     }
 
                     return false;
@@ -1492,6 +1609,8 @@ public class MainActivity extends Activity {
         );
 
         dialog.show();
+
+        animateDialogIn(panel);
     }
 
     private boolean deleteBook(
@@ -1982,25 +2101,30 @@ public class MainActivity extends Activity {
 
                                 controls.animate()
                                         .alpha(0f)
-                                        .setDuration(100)
-                                        .withEndAction(() ->
-                                                controls.setVisibility(
-                                                        View.GONE
+                                        .translationY(dp(16))
+                                        .setDuration(130)
+                                        .setInterpolator(
+                                                new android.view.animation.AccelerateInterpolator(
+                                                        1.2f
                                                 )
                                         )
+                                        .withEndAction(() -> {
+
+                                            controls.setVisibility(
+                                                    View.GONE
+                                            );
+
+                                            controls.setTranslationY(0f);
+                                        })
                                         .start();
 
                             } else {
 
-                                controls.setAlpha(0f);
+                                animateControlIn(controls);
+
                                 controls.setVisibility(
                                         View.VISIBLE
                                 );
-
-                                controls.animate()
-                                        .alpha(1f)
-                                        .setDuration(140)
-                                        .start();
                             }
                         }
 
@@ -2087,14 +2211,16 @@ public class MainActivity extends Activity {
                                     == MotionEvent.ACTION_DOWN
                     ) {
 
-                        v.setAlpha(0.6f);
+                        animateButtonPress(v);
 
                     } else if (
                             event.getAction()
                                     == MotionEvent.ACTION_UP
+                                    || event.getAction()
+                                    == MotionEvent.ACTION_CANCEL
                     ) {
 
-                        v.setAlpha(1f);
+                        animateButtonRelease(v);
                     }
 
                     return false;
@@ -2581,6 +2707,9 @@ public class MainActivity extends Activity {
         final Runnable[] refresh =
                 new Runnable[1];
 
+        final boolean[] firstRender =
+                {true};
+
         refresh[0] =
                 new Runnable() {
 
@@ -2709,6 +2838,17 @@ public class MainActivity extends Activity {
                                     rowParams
                             );
 
+                            if (firstRender[0]) {
+
+                                animateAppear(
+                                        row,
+                                        Math.min(
+                                                i * 18L,
+                                                180L
+                                        )
+                                );
+                            }
+
                             View.OnLongClickListener
                                     startDrag =
                                     v -> {
@@ -2716,10 +2856,9 @@ public class MainActivity extends Activity {
                                         row.animate()
                                                 .scaleX(0.98f)
                                                 .scaleY(0.98f)
+                                                .alpha(0.65f)
                                                 .setDuration(80)
                                                 .start();
-
-                                        row.setAlpha(0.65f);
 
                                         View.DragShadowBuilder
                                                 shadow =
@@ -2853,6 +2992,9 @@ public class MainActivity extends Activity {
                                                                 from
                                                         );
 
+                                                        firstRender[0] =
+                                                                false;
+
                                                         refresh[0]
                                                                 .run();
                                                     }
@@ -2877,6 +3019,8 @@ public class MainActivity extends Activity {
                                     }
                             );
                         }
+
+                        firstRender[0] = false;
                     }
                 };
 
@@ -2904,6 +3048,8 @@ public class MainActivity extends Activity {
         );
 
         dialog.show();
+
+        animateDialogIn(panel);
     }
 
     // =========================================================
@@ -2976,7 +3122,10 @@ public class MainActivity extends Activity {
                         ArrayList<File> current =
                                 images(book);
 
-                        for (File file : current) {
+                        for (int i = 0; i < current.size(); i++) {
+
+                            final File file =
+                                    current.get(i);
 
                             final File targetFile =
                                     file;
@@ -3140,6 +3289,14 @@ public class MainActivity extends Activity {
                                     row,
                                     rowParams
                             );
+
+                            animateAppear(
+                                    row,
+                                    Math.min(
+                                            i * 16L,
+                                            160L
+                                    )
+                            );
                         }
                     }
                 };
@@ -3147,6 +3304,8 @@ public class MainActivity extends Activity {
         refreshList[0].run();
 
         dialog.show();
+
+        animateDialogIn(panel);
     }
 
     // =========================================================
