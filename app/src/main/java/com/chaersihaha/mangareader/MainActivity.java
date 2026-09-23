@@ -15,6 +15,7 @@ import android.text.InputType;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -53,13 +54,18 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        // 隐藏顶部状态栏
+        getWindow().setFlags(
+                WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                WindowManager.LayoutParams.FLAG_FULLSCREEN
+        );
+
         sp = getSharedPreferences("meta", MODE_PRIVATE);
 
         booksDir = new File(getFilesDir(), "books");
         booksDir.mkdirs();
 
         setTitle("GPT漫画");
-
         showShelf();
     }
 
@@ -131,7 +137,6 @@ public class MainActivity extends Activity {
     private void showShelf() {
 
         currentBook = null;
-
         base();
 
         LinearLayout header =
@@ -309,7 +314,6 @@ public class MainActivity extends Activity {
         if (books == null) {
 
             showEmptyShelf();
-
             return;
         }
 
@@ -326,12 +330,10 @@ public class MainActivity extends Activity {
         if (list.isEmpty()) {
 
             showEmptyShelf();
-
             return;
         }
 
         loadShelfOrder(list);
-
         rebuildShelf(list);
     }
 
@@ -345,6 +347,7 @@ public class MainActivity extends Activity {
         );
 
         empty.setTextSize(14);
+
         empty.setTextColor(
                 Color.rgb(105, 105, 105)
         );
@@ -406,7 +409,6 @@ public class MainActivity extends Activity {
 
                     ordered.add(book);
                     used.add(name);
-
                     break;
                 }
             }
@@ -1020,6 +1022,7 @@ public class MainActivity extends Activity {
         );
 
         manage.setTextSize(17);
+
         manage.setTextColor(
                 Color.rgb(
                         220,
@@ -1087,7 +1090,6 @@ public class MainActivity extends Activity {
                 v -> {
 
                     dialog.dismiss();
-
                     reader(book);
                 }
         );
@@ -1096,7 +1098,6 @@ public class MainActivity extends Activity {
                 v -> {
 
                     dialog.dismiss();
-
                     manageBook(book);
                 }
         );
@@ -1155,7 +1156,6 @@ public class MainActivity extends Activity {
         getCoverDir(book).mkdirs();
 
         showShelf();
-
         reader(book);
     }
 
@@ -1223,6 +1223,7 @@ public class MainActivity extends Activity {
 
         rename.setTextSize(16);
         rename.setTextColor(Color.WHITE);
+
         rename.setGravity(
                 Gravity.CENTER
         );
@@ -1262,6 +1263,7 @@ public class MainActivity extends Activity {
         );
 
         changeCover.setTextSize(16);
+
         changeCover.setTextColor(
                 Color.rgb(
                         220,
@@ -1319,6 +1321,7 @@ public class MainActivity extends Activity {
         );
 
         delete.setTextSize(16);
+
         delete.setTextColor(
                 Color.rgb(
                         210,
@@ -1402,7 +1405,6 @@ public class MainActivity extends Activity {
                     );
 
                     dialog.dismiss();
-
                     showShelf();
                 }
         );
@@ -1452,7 +1454,6 @@ public class MainActivity extends Activity {
                                     (d, which) -> {
 
                                         deleteBook(book);
-
                                         showShelf();
                                     }
                             )
@@ -1516,6 +1517,7 @@ public class MainActivity extends Activity {
                     name.isEmpty()
                             || name.equals(bookName)
             ) {
+
                 continue;
             }
 
@@ -1622,7 +1624,6 @@ public class MainActivity extends Activity {
                 );
 
         if (saved.isEmpty()) {
-
             return result;
         }
 
@@ -1646,7 +1647,6 @@ public class MainActivity extends Activity {
 
                     ordered.add(file);
                     used.add(name);
-
                     break;
                 }
             }
@@ -1695,6 +1695,7 @@ public class MainActivity extends Activity {
                                 a.charAt(ia)
                         )
                 ) {
+
                     ia++;
                 }
 
@@ -1704,6 +1705,7 @@ public class MainActivity extends Activity {
                                 b.charAt(ib)
                         )
                 ) {
+
                     ib++;
                 }
 
@@ -1787,7 +1789,6 @@ public class MainActivity extends Activity {
     ) {
 
         currentBook = book;
-
         base();
 
         FrameLayout readerContainer =
@@ -2039,6 +2040,7 @@ public class MainActivity extends Activity {
         button.setText(text);
         button.setTextSize(13);
         button.setTextColor(Color.WHITE);
+
         button.setGravity(
                 Gravity.CENTER
         );
@@ -2100,6 +2102,7 @@ public class MainActivity extends Activity {
                 resultCode != RESULT_OK
                         || data == null
         ) {
+
             return;
         }
 
@@ -2156,6 +2159,7 @@ public class MainActivity extends Activity {
                     pendingCoverDisplayName
                             == null
             ) {
+
                 return;
             }
 
@@ -2614,6 +2618,7 @@ public class MainActivity extends Activity {
                             );
 
                             fileName.setTextSize(13);
+
                             fileName.setTextColor(
                                     Color.WHITE
                             );
@@ -2652,6 +2657,7 @@ public class MainActivity extends Activity {
                             );
 
                             delete.setTextSize(14);
+
                             delete.setTextColor(
                                     Color.WHITE
                             );
@@ -2716,7 +2722,6 @@ public class MainActivity extends Activity {
         if (currentBook != null) {
 
             currentBook = null;
-
             showShelf();
 
             return;
