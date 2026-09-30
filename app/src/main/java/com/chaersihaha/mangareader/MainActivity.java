@@ -33,6 +33,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class MainActivity extends Activity {
 
@@ -2000,14 +2002,14 @@ private void reader(
             )  
     );  
 
-    ScrollView scroll =  
+    final ScrollView scroll =  
             new ScrollView(this);  
 
     scroll.setBackgroundColor(  
             Color.BLACK  
     );  
 
-    LinearLayout imageList =  
+    final LinearLayout imageList =  
             new LinearLayout(this);  
 
     imageList.setOrientation(  
@@ -2018,44 +2020,58 @@ private void reader(
             Color.BLACK  
     );  
 
-    ArrayList<File> files =  
+    final ArrayList<File> files =  
             images(book);  
 
-    int screenWidth = getResources().getDisplayMetrics().widthPixels;
+    final int screenWidth = getResources().getDisplayMetrics().widthPixels;
+    final int screenHeight = getResources().getDisplayMetrics().heightPixels;
 
-    for (File file : files) {  
+    // 懒加载相关
+    final ArrayList<ImageView> imageViews = new ArrayList<>();
+    final ArrayList<TextView> loadingTexts = new ArrayList<>();
+    final boolean[] loaded = new boolean[files.size()];
+    final boolean[] loading = new boolean[files.size()];
+    final ExecutorService loadExecutor = Executors.newFixedThreadPool(3);
 
-        ImageView image =  
-                new ImageView(this);  
+    // 预加载前后各 3 页
+    final int PRELOAD = 3;
 
-        image.setAdjustViewBounds(true);  
+    for (int i = 0; i < files.size(); i++) {
 
-        image.setScaleType(  
-                ImageView.ScaleType.FIT_CENTER  
-        );  
+        // 每个图片用 FrameLayout 包一层，方便放「加载中」
+        FrameLayout container = new FrameLayout(this);
+        container.setBackgroundColor(Color.BLACK);
 
+        ImageView image = new ImageView(this);
+        image.setAdjustViewBounds(true);
+        image.setScaleType(ImageView.ScaleType.FIT_CENTER);
         image.setBackgroundColor(Color.BLACK);
 
-        // 后台线程 + 降采样加载，避免一次性把所有原图塞进内存导致闪退
-        final File f = file;
-        final ImageView iv = image;
-        new Thread(() -> {
-            Bitmap bmp = loadSampledBitmap(f, screenWidth, screenWidth * 4);
-            if (bmp != null) {
-                runOnUiThread(() -> iv.setImageBitmap(bmp));
-            }
-        }).start();
+        TextView loadingText = makeLabel("加载中", 14, TEXT_MUTED);
+        loadingText.setGravity(Gravity.CENTER);
 
-        imageList.addView(  
-                image,  
-                new LinearLayout.LayoutParams(  
-                        -1,  
-                        -2  
-                )  
-        );  
-    }  
+        FrameLayout.LayoutParams imgParams = new FrameLayout.LayoutParams(-1, -2);
+        container.addView(image, imgParams);
 
-    scroll.addView(imageList);  
+        FrameLayout.LayoutParams textParams = new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER);
+        container.addView(loadingText, textParams);
+
+        imageList.addView(container, new LinearLayout.LayoutParams(-1, -2));
+
+        imageViews.add(image);
+        loadingTexts.add(loadingText);
+
+        // 细灰色分隔线
+        if (i < files.size() - 1) {
+            View divider = new View(this);
+            divider.setBackgroundColor(Color.rgb(48, 48, 52));
+            LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(-1, dp(2));
+            dividerParams.setMargins(0, dp(1), 0, dp(1));
+            imageList.addView(divider, dividerParams);
+        }
+    }
+
+    scroll.addView(imageList);
 
     readerContainer.addView(  
             scroll,  
@@ -2065,6 +2081,89 @@ private void reader(
             )  
     );  
 
+    // 加载指定索引的图片（高清，只按屏幕宽度采样）
+    final Runnable[] checkAndLoad = new Runnable[1];
+
+    checkAndLoad[0] = () -> {
+        if (files.isEmpty()) return;
+
+        int scrollY = scroll.getScrollY();
+        int viewHeight = scroll.getHeight();
+        if (viewHeight <= 0) viewHeight = screenHeight;
+
+        // 可见范围上下扩展 PRELOAD 页的大概高度（用屏幕高度估算）
+        int expand = PRELOAD * viewHeight;
+        int visibleTop = Math.max(0, scrollY - expand);
+        int visibleBottom = scrollY + viewHeight + expand;
+
+        for (int i = 0; i < files.size(); i++) {
+            // 每个 container 的位置（注意中间有 divider，所以 child index 要算）
+            // 简化：用 image 的 parent 的 top
+            View container = (View) imageViews.get(i).getParent();
+            if (container == null) continue;
+
+            int top = container.getTop();
+            int bottom = container.getBottom();
+
+            boolean inRange = (bottom > visibleTop && top < visibleBottom);
+
+            if (inRange) {
+                if (!loaded[i] && !loading[i]) {
+                    loading[i] = true;
+                    final int idx = i;
+                    final File f = files.get(i);
+                    final ImageView iv = imageViews.get(i);
+                    final TextView lt = loadingTexts.get(i);
+
+                    loadExecutor.execute(() -> {
+                        // 高清：只限制宽度，高度给足够大，不牺牲清晰度
+                        Bitmap bmp = loadSampledBitmap(f, screenWidth, screenWidth * 10);
+                        runOnUiThread(() -> {
+                            if (bmp != null) {
+                                iv.setImageBitmap(bmp);
+                                lt.setVisibility(View.GONE);
+                                loaded[idx] = true;
+
+                                // 锁定高度，防止释放 Bitmap 后高度塌陷导致滚动跳动
+                                iv.post(() -> {
+                                    int h = iv.getHeight();
+                                    if (h > 0) {
+                                        View parent = (View) iv.getParent();
+                                        if (parent != null) {
+                                            LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) parent.getLayoutParams();
+                                            lp.height = h;
+                                            parent.setLayoutParams(lp);
+                                        }
+                                    }
+                                });
+                            } else {
+                                lt.setText("加载失败");
+                            }
+                            loading[idx] = false;
+                        });
+                    });
+                }
+            } else {
+                // 远离可见区，释放内存
+                if (loaded[i]) {
+                    imageViews.get(i).setImageBitmap(null);
+                    loadingTexts.get(i).setVisibility(View.VISIBLE);
+                    loadingTexts.get(i).setText("加载中");
+                    loaded[i] = false;
+                }
+            }
+        }
+    };
+
+    // 滚动时检查
+    scroll.setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
+        checkAndLoad[0].run();
+    });
+
+    // 首次进入先加载
+    scroll.post(() -> checkAndLoad[0].run());
+
+    // ========== 控制栏 ==========
     final LinearLayout controls =  
             new LinearLayout(this);  
 
@@ -2140,6 +2239,7 @@ private void reader(
     final long[] lastTap =  
             {0};  
 
+    // 只有屏幕正中间区域双击才触发控制栏
     scroll.setOnTouchListener(  
             (v, event) -> {  
 
@@ -2148,49 +2248,60 @@ private void reader(
                                 == MotionEvent.ACTION_UP  
                 ) {  
 
-                    long now =  
-                            System.currentTimeMillis();  
+                    float x = event.getX();
+                    float y = event.getY();
+                    int w = v.getWidth();
+                    int h = v.getHeight();
 
-                    if (  
-                            now - lastTap[0]  
-                                    < 350  
-                    ) {  
+                    // 正中间区域：宽 40%，高 40%
+                    boolean inCenter = (x > w * 0.3f && x < w * 0.7f &&
+                                       y > h * 0.3f && y < h * 0.7f);
+
+                    if (inCenter) {
+                        long now =  
+                                System.currentTimeMillis();  
 
                         if (  
-                                controls.getVisibility()  
-                                        == View.VISIBLE  
+                                now - lastTap[0]  
+                                        < 350  
                         ) {  
 
-                            controls.animate()  
-                                    .alpha(0f)  
-                                    .translationY(dp(16))  
-                                    .setDuration(130)  
-                                    .setInterpolator(  
-                                            new android.view.animation.AccelerateInterpolator(  
-                                                    1.2f  
-                                            )  
-                                    )  
-                                    .withEndAction(() -> {  
+                            if (  
+                                    controls.getVisibility()  
+                                            == View.VISIBLE  
+                            ) {  
 
-                                        controls.setVisibility(  
-                                                View.GONE  
-                                        );  
+                                controls.animate()  
+                                        .alpha(0f)  
+                                        .translationY(dp(16))  
+                                        .setDuration(130)  
+                                        .setInterpolator(  
+                                                new android.view.animation.AccelerateInterpolator(  
+                                                        1.2f  
+                                                )  
+                                        )  
+                                        .withEndAction(() -> {  
 
-                                        controls.setTranslationY(0f);  
-                                    })  
-                                    .start();  
+                                            controls.setVisibility(  
+                                                    View.GONE  
+                                            );  
 
-                        } else {  
+                                            controls.setTranslationY(0f);  
+                                        })  
+                                        .start();  
 
-                            animateControlIn(controls);  
+                            } else {  
 
-                            controls.setVisibility(  
-                                    View.VISIBLE  
-                            );  
+                                animateControlIn(controls);  
+
+                                controls.setVisibility(  
+                                        View.VISIBLE  
+                                );  
+                            }  
                         }  
-                    }  
 
-                    lastTap[0] = now;  
+                        lastTap[0] = now;  
+                    }
                 }  
 
                 return false;  
