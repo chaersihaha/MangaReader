@@ -23,6 +23,8 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -188,6 +190,44 @@ private int dp(int value) {
                             .density  
                     + 0.5f  
     );  
+}
+
+// =========================================================  
+// 图片降采样工具（防止 OOM 闪退）  
+// =========================================================  
+
+private int calculateInSampleSize(BitmapFactory.Options options, int reqWidth, int reqHeight) {
+    int height = options.outHeight;
+    int width = options.outWidth;
+    int inSampleSize = 1;
+
+    if (height > reqHeight || width > reqWidth) {
+        final int halfHeight = height / 2;
+        final int halfWidth = width / 2;
+
+        while ((halfHeight / inSampleSize) >= reqHeight
+                && (halfWidth / inSampleSize) >= reqWidth) {
+            inSampleSize *= 2;
+        }
+    }
+    return inSampleSize;
+}
+
+private Bitmap loadSampledBitmap(File file, int reqWidth, int reqHeight) {
+    try {
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inJustDecodeBounds = true;
+        BitmapFactory.decodeFile(file.getAbsolutePath(), options);
+
+        options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight);
+        options.inJustDecodeBounds = false;
+        options.inPreferredConfig = Bitmap.Config.RGB_565;
+
+        return BitmapFactory.decodeFile(file.getAbsolutePath(), options);
+    } catch (OutOfMemoryError | Exception e) {
+        e.printStackTrace();
+        return null;
+    }
 }  
 
 private void base() {  
@@ -866,11 +906,10 @@ private void addBook(
 
     if (hasCover(book)) {  
 
-        coverView.setImageURI(  
-                Uri.fromFile(  
-                        getCoverFile(book)  
-                )  
-        );  
+        Bitmap coverBmp = loadSampledBitmap(getCoverFile(book), 400, 560);
+        if (coverBmp != null) {
+            coverView.setImageBitmap(coverBmp);
+        }  
 
     } else {  
 
@@ -1193,11 +1232,10 @@ private void showBookMenu(
                 ImageView.ScaleType.FIT_CENTER  
         );  
 
-        cover.setImageURI(  
-                Uri.fromFile(  
-                        getCoverFile(book)  
-                )  
-        );  
+        Bitmap coverBmp = loadSampledBitmap(getCoverFile(book), 400, 560);
+        if (coverBmp != null) {
+            cover.setImageBitmap(coverBmp);
+        }  
 
         panel.addView(  
                 cover,  
@@ -1983,6 +2021,8 @@ private void reader(
     ArrayList<File> files =  
             images(book);  
 
+    int screenWidth = getResources().getDisplayMetrics().widthPixels;
+
     for (File file : files) {  
 
         ImageView image =  
@@ -1991,12 +2031,20 @@ private void reader(
         image.setAdjustViewBounds(true);  
 
         image.setScaleType(  
-                ImageView.ScaleType.CENTER_CROP  
+                ImageView.ScaleType.FIT_CENTER  
         );  
 
-        image.setImageURI(  
-                Uri.fromFile(file)  
-        );  
+        image.setBackgroundColor(Color.BLACK);
+
+        // 后台线程 + 降采样加载，避免一次性把所有原图塞进内存导致闪退
+        final File f = file;
+        final ImageView iv = image;
+        new Thread(() -> {
+            Bitmap bmp = loadSampledBitmap(f, screenWidth, screenWidth * 4);
+            if (bmp != null) {
+                runOnUiThread(() -> iv.setImageBitmap(bmp));
+            }
+        }).start();
 
         imageList.addView(  
                 image,  
@@ -2802,9 +2850,10 @@ private void manualSortImages(
                                 ImageView.ScaleType.CENTER_CROP  
                         );  
 
-                        thumbnail.setImageURI(  
-                                Uri.fromFile(file)  
-                        );  
+                        Bitmap thumb = loadSampledBitmap(file, 80, 100);
+                        if (thumb != null) {
+                            thumbnail.setImageBitmap(thumb);
+                        }  
 
                         thumbnail.setBackground(  
                                 roundedBg(  
@@ -3292,9 +3341,10 @@ private void manageImages(
                                 ImageView.ScaleType.CENTER_CROP  
                         );  
 
-                        image.setImageURI(  
-                                Uri.fromFile(file)  
-                        );  
+                        Bitmap thumb = loadSampledBitmap(file, 200, 260);
+                        if (thumb != null) {
+                            image.setImageBitmap(thumb);
+                        }  
 
                         row.addView(  
                                 image,  
